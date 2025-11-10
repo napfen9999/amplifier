@@ -10,7 +10,8 @@ from pathlib import Path
 from typing import cast
 
 # Add amplifier to path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+# IMPORTANT: Use .resolve() to handle symlinks correctly when amplifier is a submodule
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 from amplifier.memory import Memory
 from amplifier.memory import MemoryCategory
 from amplifier.memory import MemoryStore
