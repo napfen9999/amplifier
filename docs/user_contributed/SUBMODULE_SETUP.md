@@ -705,6 +705,52 @@ git commit -m "Update Amplifier submodule"
 
 ---
 
+### Issue: Pyright hangs during `make check`
+
+**Symptom**: Type checking hangs indefinitely after ruff checks pass
+```bash
+$ make check
+Running ruff format...
+269 files left unchanged
+Running ruff check...
+All checks passed!
+Running pyright...
+uv run pyright
+# <hangs here indefinitely>
+```
+
+**Cause**: Pyright attempts to scan symlinked directories (`.claude/`, `.ai/`) and the `amplifier/` submodule, which contain Python files that import from the `amplifier` package. These imports cannot be resolved in the parent project context.
+
+**Solution**: Add exclusions to `pyproject.toml`
+```toml
+[tool.pyright]
+pythonVersion = "3.11"
+typeCheckingMode = "standard"
+reportMissingTypeStubs = false
+exclude = [
+    ".venv",
+    "__pycache__",
+    ".pytest_cache",
+    ".ruff_cache",
+    "**/__pycache__",
+    "scripts",
+    "amplifier",      # Git submodule
+    ".claude",        # Symlink to amplifier/.claude/
+    ".ai",            # Symlink to amplifier/.ai/
+]
+```
+
+**Verification**:
+```bash
+$ uv run pyright
+0 errors, 0 warnings, 0 informations
+✅ Completes in ~5 seconds
+```
+
+**Why this works**: The symlinked tools (`.claude/tools/*.py`) import from `amplifier.memory`, `amplifier.search`, etc. These imports fail in the parent project context because the Amplifier package isn't available at the parent level. Excluding these directories tells pyright to only check your project code, not the Amplifier submodule or its tooling.
+
+---
+
 ### Issue: Two Python environments conflict
 
 **Symptom**: Imports work in one place, fail in another
