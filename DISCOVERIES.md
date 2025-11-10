@@ -2,6 +2,115 @@
 
 This file documents non-obvious problems, solutions, and patterns discovered during development. Make sure these are regularly reviewed and updated, removing outdated entries or those replaced by better practices or code or tools, updating those where the best practice has evolved.
 
+## Amplifier as Submodule: Symlink + Python Path Resolution (2025-11-10)
+
+### Issue
+
+When using Amplifier as a git submodule in a parent project (inverted from standard setup), slash commands, agents, and hooks fail to work. Specifically:
+
+1. Claude Code can't find `.claude/` directory (looks in workspace root, not submodule)
+2. Python hooks fail with `ImportError: No module named 'amplifier.memory'`
+
+### Root Cause
+
+Two separate issues combining to break functionality:
+
+**Issue 1: Claude Code Integration**
+- Claude Code searches for `.claude/` in workspace root (`$CLAUDE_PROJECT_DIR/.claude`)
+- Standard Amplifier setup assumes Amplifier IS the workspace root
+- When Amplifier is a submodule, `.claude/` is nested in `amplifier/.claude/`
+
+**Issue 2: Python Import Path with Symlinks**
+- Hook script adds parent path using: `sys.path.insert(0, str(Path(__file__).parent.parent.parent))`
+- **Without `.resolve()`**, symlinks aren't followed:
+  - `Path(__file__)` = `/project/.claude/tools/hook_session_start.py` (symlink path)
+  - `parent.parent.parent` = `/project/` (WRONG - points to project root, not amplifier/)
+- **With `.resolve()`**, symlinks are resolved:
+  - `Path(__file__).resolve()` = `/project/amplifier/.claude/tools/hook_session_start.py` (real path)
+  - `parent.parent.parent` = `/project/amplifier/` (CORRECT - can import amplifier modules)
+
+**Amplifier Module Structure**:
+```
+project/
+└── amplifier/              # Git submodule
+    ├── .claude/           # Claude Code config
+    ├── amplifier/         # Python package (NESTED!)
+    │   ├── __init__.py
+    │   ├── memory/
+    │   └── search/
+    └── pyproject.toml
+```
+
+The Python modules are in `amplifier/amplifier/`, requiring sys.path to point to outer `amplifier/` directory.
+
+### Solution
+
+**Two-part fix:**
+
+**Part 1: Create Symlink for Claude Code**
+```bash
+# In project root
+ln -s amplifier/.claude .claude
+```
+
+This makes all Claude Code features available:
+- Slash commands (`/ddd:1-plan`, `/ultrathink-task`, etc.)
+- AI agents (30+ specialists)
+- Hooks (SessionStart, PostToolUse, PreCompact)
+- Tools (statusline, transcripts, worktrees)
+
+**Part 2: Fix Python Import Path in Hooks**
+
+Edit `amplifier/.claude/tools/hook_session_start.py` line 13:
+
+```python
+# BEFORE (fails with symlinks):
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+# AFTER (works with symlinks):
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+```
+
+**Critical**: Add `.resolve()` BEFORE calculating parent path to properly follow symlinks.
+
+### Verification
+
+```bash
+# Test 1: Symlink exists
+ls -la .claude  # Should show: .claude -> amplifier/.claude
+
+# Test 2: Commands available
+ls .claude/commands/  # Should show 10+ commands
+
+# Test 3: Hook imports work
+echo '{}' | python3 .claude/tools/hook_session_start.py 2>&1 | grep -i error
+# Should NOT show "Failed to import amplifier modules"
+```
+
+### Key Learnings
+
+1. **Symlinks require `.resolve()`** - When using `Path(__file__)` with symlinked directories, always use `.resolve()` before calculating relative paths
+2. **Claude Code expects `.claude/` at workspace root** - Projects using Amplifier as submodule need symlink
+3. **Python package nesting matters** - Amplifier's structure has Python modules in `amplifier/amplifier/`, not at repository root
+4. **Test with actual symlinks** - Path calculations work differently with symlinks vs direct paths
+
+### Prevention
+
+- When writing hooks that use `Path(__file__)`, always use `.resolve()` for symlink compatibility
+- Document inverted setup patterns (Amplifier as submodule vs standard host setup)
+- Provide setup automation script for submodule users
+- Consider detecting symlink setup and adjusting paths automatically
+
+### Documentation
+
+Created comprehensive setup guide: `docs/AMPLIFIER_SUBMODULE_SETUP.md`
+
+Includes:
+- Step-by-step setup instructions
+- Automated setup script (`setup_amplifier_submodule.sh`)
+- Troubleshooting guide
+- Architecture comparison (standard vs inverted)
+
 ## DevContainer Setup: Using Official Features Instead of Custom Scripts (2025-10-22)
 
 ### Issue
