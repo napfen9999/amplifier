@@ -17,6 +17,7 @@
    - [AI Synthesis Engines](#2-ai-synthesis-engines)
    - [Knowledge Synthesis](#3-knowledge-synthesis)
    - [Knowledge Integration](#4-knowledge-integration)
+   - [Memory System](#5-memory-system)
 5. [Usage Examples](#usage-examples)
 6. [Dependencies](#dependencies)
 7. [Troubleshooting](#troubleshooting)
@@ -39,6 +40,7 @@ Amplifier provides two tiers of functionality:
 - AI Synthesis Engines
 - Knowledge Synthesis
 - Knowledge Integration
+- Memory System (Persistent conversation memory with queue-based extraction)
 
 This document covers the Advanced Features.
 
@@ -322,6 +324,144 @@ knowledge_integration.visualize_graph(
     output="knowledge_network.html"
 )
 ```
+
+---
+
+### 5. Memory System
+
+**Module**: `amplifier.memory`
+
+Persistent conversation memory with queue-based extraction to prevent cascade issues.
+
+#### Components
+
+**`MemoryStore`** - Persistent storage for memories
+- Store and retrieve conversation memories
+- JSON-based storage (`.data/memory.json`)
+- Category-based organization
+
+**`queue`** - JSONL-based queue for extraction jobs
+- Non-blocking queueing (<1ms)
+- Decouples hooks from LLM calls
+- Background processing architecture
+
+**`processor`** - Background extraction daemon
+- Polls queue every 30 seconds
+- Extracts memories using Claude Code SDK
+- Handles errors gracefully
+
+**`filter`** - Message filtering
+- Removes sidechain messages
+- Cleans subagent warmup noise
+- Preserves main conversation
+
+**`circuit_breaker`** - Cascade prevention
+- Frequency-based throttle (5 hooks/min)
+- Prevents runaway hook invocations
+- File-based state persistence
+
+**`router`** - Event routing logic
+- Routes Stop vs SubagentStop events
+- Integrates circuit breaker
+- Clear routing decisions
+
+#### Capabilities
+
+✅ Queue-based architecture (no blocking hooks)
+✅ Background processing daemon
+✅ Sidechain message filtering
+✅ Circuit breaker prevents cascade
+✅ Hook execution <10ms (queuing only)
+✅ Graceful error handling
+
+#### Use Cases
+
+- Persistent conversation memory across sessions
+- Learning from past interactions
+- Context awareness for future conversations
+- Preventing memory cascade issues (<10 hook invocations vs 12,466)
+
+#### Architecture
+
+**Before** (Direct Extraction):
+```
+Hook → LLM Call (30-60s) → Spawns Subagent → CASCADE
+Result: 12,466 hook invocations
+```
+
+**After** (Queue-Based):
+```
+Hook → Queue (<10ms) → Background Processor → LLM Extraction
+Result: <10 hook invocations
+```
+
+#### Configuration (Per-Project Control)
+
+Enable/disable Memory System **per parent project** via `.env`:
+
+```bash
+# Parent project .env (e.g., brand-composer/.env)
+MEMORY_SYSTEM_ENABLED=true   # Enable for this project
+
+# Submodule .env (amplifier/.env)
+MEMORY_SYSTEM_ENABLED=false  # Safe default (disabled)
+```
+
+**How it works**:
+1. Hook loads submodule `.env` first (defaults)
+2. Hook loads parent `.env` second (overrides with `override=True`)
+3. Parent project controls whether Memory System is active
+
+**Per-project flexibility**:
+- Project A: `MEMORY_SYSTEM_ENABLED=true` (memory active)
+- Project B: `MEMORY_SYSTEM_ENABLED=false` (memory disabled)
+- Same Amplifier submodule, different behavior
+
+#### Example
+
+```python
+from amplifier.memory import MemoryStore
+
+# Store a memory
+store = MemoryStore()
+store.add_memory(
+    content="User prefers TypeScript over JavaScript",
+    category="preference",
+    metadata={"project": "my-app"}
+)
+
+# Retrieve memories
+recent = store.get_recent_memories(limit=5)
+for memory in recent:
+    print(f"{memory.category}: {memory.content}")
+
+# Search memories
+typescript_prefs = store.search_memories(
+    query="typescript",
+    category="preference"
+)
+```
+
+#### Background Processor
+
+Run the daemon to process queued extractions:
+
+```bash
+# Start background processor
+python -m amplifier.memory.processor
+
+# Or as a systemd service / supervisor job
+```
+
+**Logs**: `.claude/logs/stop_hook_YYYYMMDD.log`
+
+#### Requirements
+
+- Claude Code SDK (`claude-code-sdk`)
+- `ANTHROPIC_API_KEY` environment variable
+- Python 3.11+
+
+**See**: [MEMORY_SYSTEM.md](../MEMORY_SYSTEM.md) for complete documentation.
 
 ---
 

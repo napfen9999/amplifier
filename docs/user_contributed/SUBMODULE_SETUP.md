@@ -119,11 +119,17 @@ cat > .vscode/settings.json << 'EOF'
 }
 EOF
 
-# 3. Install dependencies (Option A: In parent project)
+# 3. Configure parent project .env (per-project control)
+cat > .env << 'EOF'
+MEMORY_SYSTEM_ENABLED=true
+ANTHROPIC_API_KEY=your-api-key-here
+EOF
+
+# 4. Install dependencies (Option A: In parent project)
 uv pip install networkx langchain langchain-core langchain-openai \
                pydantic-settings rapidfuzz tiktoken pyvis
 
-# 4. Verify
+# 5. Verify
 python3 -c "
 import sys
 sys.path.insert(0, 'amplifier')
@@ -285,7 +291,49 @@ Then create `.vscode/settings.json` with the following content:
 
 ---
 
-### Step 3: Fix Python Import Path for Hooks
+### Step 3: Configure .env for Per-Project Control
+
+**Critical for Multi-Project Usage**: Each parent project can independently enable/disable Amplifier features via `.env` configuration.
+
+#### Create Parent Project .env
+
+In your parent project root (NOT in the amplifier submodule):
+
+```bash
+# your-project/.env
+MEMORY_SYSTEM_ENABLED=true     # Enable memory system for THIS project
+ANTHROPIC_API_KEY=sk-...       # Your API key for LLM features
+```
+
+**Why This Works**:
+1. Hook loads **submodule `.env`** first (safe defaults: `MEMORY_SYSTEM_ENABLED=false`)
+2. Hook loads **parent `.env`** second with `override=True` (your project's settings win)
+3. Each parent project controls feature activation independently
+
+**Example Multi-Project Setup**:
+```
+project-a/
+├── .env (MEMORY_SYSTEM_ENABLED=true)   # Memory active
+└── amplifier/ (submodule)
+
+project-b/
+├── .env (MEMORY_SYSTEM_ENABLED=false)  # Memory disabled
+└── amplifier/ (same submodule!)
+```
+
+**Same submodule, different behavior per project.**
+
+**Verification**:
+```bash
+# Test hook respects parent .env
+echo '{"event": "Stop"}' | .venv/bin/python3 .claude/tools/hook_stop.py 2>&1 | grep -i "memory system"
+# Should show: "Starting memory extraction" (if enabled)
+#           or "Memory system disabled" (if disabled)
+```
+
+---
+
+### Step 4: Fix Python Import Path for Hooks
 
 **Critical Step**: Hooks need access to both Amplifier modules AND venv dependencies (like `claude-code-sdk`).
 
@@ -364,7 +412,7 @@ tail -20 amplifier/.claude/logs/session_start_$(date +%Y%m%d).log
 
 ---
 
-### Step 4: Choose Dependency Management Strategy
+### Step 5: Choose Dependency Management Strategy
 
 You have two options for managing Amplifier's dependencies:
 
@@ -427,7 +475,7 @@ sys.path.insert(0, 'amplifier/.venv/lib/python3.12/site-packages')  # Dependenci
 
 ---
 
-### Step 5: Configure Python Imports
+### Step 6: Configure Python Imports
 
 In your Python code, add Amplifier to the module search path:
 

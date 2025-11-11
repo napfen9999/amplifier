@@ -28,7 +28,12 @@ sys.path.insert(0, str(amplifier_root))
 # Load environment variables from .env file
 from dotenv import load_dotenv  # noqa: E402
 
-load_dotenv()
+# Submodule-friendly .env loading:
+# 1. Load submodule .env first (defaults)
+# 2. Load parent project .env second (overrides)
+# This allows each parent project to control MEMORY_SYSTEM_ENABLED independently
+load_dotenv(dotenv_path=amplifier_root / ".env")  # Submodule defaults
+load_dotenv(dotenv_path=amplifier_root.parent / ".env", override=True)  # Parent project controls
 
 # Import logger from the same directory
 sys.path.insert(0, str(Path(__file__).parent))
