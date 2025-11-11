@@ -109,6 +109,32 @@ class MemoryExtractor:
         logger.info(f"[EXTRACTION] Extraction completed: {len(result.get('memories', []))} memories")
         return result
 
+    async def extract_from_messages_filtered(
+        self,
+        messages: list[dict[str, Any]],
+        context: str | None = None,
+        filter_sidechain: bool = True,
+    ) -> dict[str, Any]:
+        """Extract memories with optional sidechain filtering
+
+        Args:
+            messages: Conversation messages
+            context: Optional context string
+            filter_sidechain: Whether to remove sidechain messages (default: True)
+
+        Returns:
+            Extraction result dictionary with memories
+        """
+        from amplifier.memory.filter import filter_sidechain_messages
+
+        # Apply sidechain filtering if requested
+        if filter_sidechain:
+            messages = filter_sidechain_messages(messages)
+            logger.info(f"[EXTRACTION] Filtered to {len(messages)} main-chain messages")
+
+        # Use existing extraction logic
+        return await self.extract_from_messages(messages, context)
+
     def _format_messages(self, messages: list[dict[str, Any]]) -> str:
         """Format messages for extraction - optimized for performance"""
         formatted = []
