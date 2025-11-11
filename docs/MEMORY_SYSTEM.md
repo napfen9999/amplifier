@@ -4,12 +4,16 @@
 
 The Amplifier Memory System provides persistent memory extraction and retrieval capabilities for Claude Code conversations. It automatically extracts key learnings, decisions, and solutions from conversations and makes them available in future sessions.
 
+The system uses a **queue-based architecture** that decouples hook execution from memory extraction, ensuring fast hook response times and preventing recursive cascade issues.
+
 ## Features
 
-- **Automatic extraction** of memories from conversations
-- **Pattern-based extraction** for reliable operation outside Claude Code environment
+- **Queue-based extraction** - Hooks queue sessions for background processing
+- **Background processor** - Daemon handles extraction without blocking hooks
+- **Sidechain message filtering** - Removes subagent warmup noise from extraction
 - **Session persistence** across multiple conversations
 - **Relevance search** for contextual memory retrieval
+- **Circuit breaker protection** - Throttle protection against hook spam
 - **Opt-in system** via environment variable
 
 ## Configuration
@@ -41,6 +45,9 @@ MEMORY_EXTRACTION_MAX_MESSAGES=20      # Max messages to process
 MEMORY_EXTRACTION_MAX_CONTENT_LENGTH=500  # Max chars per message
 MEMORY_EXTRACTION_MAX_MEMORIES=10      # Max memories per session
 
+# Queue processing
+EXTRACTION_QUEUE_INTERVAL=30           # Background processor interval (seconds)
+
 # Storage location
 MEMORY_STORAGE_DIR=.data/memories
 ```
@@ -50,19 +57,39 @@ MEMORY_STORAGE_DIR=.data/memories
 ### Components
 
 1. **Claude Code Hooks** (`.claude/tools/`)
-   - `hook_stop.py` - Extracts memories at conversation end
+   - `hook_stop.py` - Queues sessions for extraction (lightweight, <10ms)
    - `hook_session_start.py` - Retrieves relevant memories at start
    - `hook_post_tool_use.py` - Validates claims against memories
 
-2. **Memory Extraction** (`amplifier/extraction/`)
+2. **Memory Queue** (`amplifier/memory/queue.py`)
+   - JSONL-based queue for pending extractions
+   - Fast append operations (non-blocking)
+   - Persistent across restarts
+
+3. **Background Processor** (`amplifier/memory/processor.py`)
+   - Daemon process handling queued extractions
+   - Runs independently of Claude Code hooks
+   - Polls queue every 30 seconds (configurable)
+
+4. **Message Filter** (`amplifier/memory/filter.py`)
+   - Removes sidechain messages (subagent warmup)
+   - Extracts only main conversation content
+   - Improves extraction quality
+
+5. **Memory Extraction** (`amplifier/extraction/`)
    - Pattern-based extraction fallback
    - Claude Code SDK support when available
    - Quality filtering and validation
 
-3. **Memory Storage** (`amplifier/memory/`)
+6. **Memory Storage** (`amplifier/memory/`)
    - JSON-based persistent storage
    - Categorized memories with metadata
    - Search and retrieval capabilities
+
+7. **Circuit Breaker** (`amplifier/memory/circuit_breaker.py`)
+   - Throttle protection against excessive hook frequency
+   - Prevents system overload
+   - Automatic recovery after cooldown
 
 ### Memory Categories
 
@@ -74,16 +101,57 @@ MEMORY_STORAGE_DIR=.data/memories
 
 ## How It Works
 
-### 1. Memory Extraction
+### Queue-Based Architecture
 
-When a conversation ends (Stop or SubagentStop event), the system:
+The system decouples hook execution from memory extraction for performance and reliability:
+
+```
+Claude Code Session Ends
+         ↓
+    Stop Hook Fires (lightweight)
+         ↓
+    Check Circuit Breaker
+         ↓
+    Queue Session for Extraction (<1ms)
+         ↓
+    Hook Returns Immediately
+
+         [Background Process]
+
+Background Processor Polls Queue
+         ↓
+    Read Queued Session
+         ↓
+    Filter Sidechain Messages
+         ↓
+    Call Claude SDK for Extraction
+         ↓
+    Store Memories
+         ↓
+    Remove from Queue
+```
+
+### 1. Session End (Stop Hook)
+
+When a conversation ends (Stop event), the system:
 1. Checks if memory system is enabled via environment variable
-2. Reads the conversation transcript
-3. Filters to user and assistant messages only
-4. Extracts key memories using pattern matching
-5. Stores memories with metadata (timestamp, tags, importance)
+2. Verifies circuit breaker allows queueing
+3. Appends session metadata to extraction queue (<1ms)
+4. Returns immediately (no blocking on LLM calls)
 
-### 2. Memory Retrieval
+**Note**: SubagentStop events are **not** processed to avoid cascade issues and incomplete context.
+
+### 2. Background Processing
+
+The background processor daemon:
+1. Polls the extraction queue every 30 seconds (configurable)
+2. Reads queued session transcripts
+3. Filters sidechain messages (removes subagent warmup)
+4. Extracts key memories using Claude SDK
+5. Stores memories with metadata (timestamp, tags, importance)
+6. Removes processed items from queue
+
+### 3. Memory Retrieval
 
 At conversation start (SessionStart event), the system:
 1. Checks if memory system is enabled
@@ -91,7 +159,7 @@ At conversation start (SessionStart event), the system:
 3. Retrieves recent memories for context
 4. Provides memories as additional context to Claude
 
-### 3. Claim Validation
+### 4. Claim Validation
 
 After tool use (PostToolUse event), the system:
 1. Checks if memory system is enabled
@@ -111,7 +179,7 @@ Memories are stored in JSON format at `.data/memory.json`:
       "metadata": {
         "tags": ["sdk", "claude"],
         "importance": 0.8,
-        "extraction_method": "pattern_fallback"
+        "extraction_method": "sdk"
       },
       "id": "uuid",
       "timestamp": "2025-08-26T10:10:13.391379",
@@ -130,14 +198,50 @@ Memories are stored in JSON format at `.data/memory.json`:
 }
 ```
 
+## Queue Format
+
+The extraction queue is stored at `.data/extraction_queue.jsonl`:
+
+```jsonl
+{"session_id": "abc123", "transcript_path": "/path/to/transcript.jsonl", "timestamp": "2025-11-11T14:30:00", "hook_event": "Stop"}
+{"session_id": "def456", "transcript_path": "/path/to/transcript.jsonl", "timestamp": "2025-11-11T14:35:00", "hook_event": "Stop"}
+```
+
+## Background Processor
+
+### Starting the Processor
+
+The background processor runs as a separate daemon:
+
+```bash
+# Start processor in background
+python -m amplifier.memory.processor &
+
+# Or use screen/tmux for persistent session
+screen -S memory-processor python -m amplifier.memory.processor
+```
+
+### Processor Status
+
+Check processor activity:
+
+```bash
+# Check if running
+ps aux | grep "memory.processor"
+
+# View recent extractions
+tail -f .claude/logs/processor_$(date +%Y%m%d).log
+```
+
 ## Debugging
 
 ### Log Files
 
 When enabled, the memory system logs to `.claude/logs/`:
-- `stop_hook_YYYYMMDD.log` - Stop hook logs
-- `session_start_YYYYMMDD.log` - Session start logs  
+- `stop_hook_YYYYMMDD.log` - Stop hook logs (queueing operations)
+- `session_start_YYYYMMDD.log` - Session start logs
 - `post_tool_use_YYYYMMDD.log` - Post tool use logs
+- `processor_YYYYMMDD.log` - Background processor logs
 
 Logs are automatically rotated after 7 days.
 
@@ -146,32 +250,49 @@ Logs are automatically rotated after 7 days.
 1. **Memory system not activating**
    - Ensure `MEMORY_SYSTEM_ENABLED=true` is set
    - Check logs in `.claude/logs/` for errors
+   - Verify background processor is running
 
 2. **No memories being extracted**
-   - Verify conversation has substantive content
-   - Check extraction patterns are matching
-   - Review logs for timeout errors
+   - Check extraction queue: `cat .data/extraction_queue.jsonl`
+   - Verify background processor is running: `ps aux | grep memory.processor`
+   - Review processor logs for errors
+   - Check conversation has substantive content
 
-3. **Timeout issues**
-   - Default timeout is 120 seconds
-   - May need adjustment for longer conversations
-   - Pattern extraction is used as fallback
+3. **Queue growing but not processing**
+   - Background processor may not be running
+   - Check processor logs for errors
+   - Verify Claude SDK credentials are valid
+   - Check timeout settings
+
+4. **Circuit breaker activated**
+   - Too many hook events in short period
+   - Check logs for "Circuit breaker" messages
+   - System will automatically recover after cooldown
+
+## Performance Characteristics
+
+- **Hook execution**: <10ms (queue append only)
+- **Background processing**: 30-60 seconds per session
+- **Memory retrieval**: <100ms (indexed search)
+- **No blocking operations** in Claude Code hooks
 
 ## Implementation Philosophy
 
 The memory system follows the project's core philosophies:
 
-- **Ruthless Simplicity** - Pattern-based extraction, JSON storage
-- **Modular Design** - Self-contained hooks and modules
-- **Fail Gracefully** - Opt-in system that doesn't break workflows
+- **Ruthless Simplicity** - File-based queue, simple polling
+- **Modular Design** - Self-contained modules with stable interfaces
+- **Fail Gracefully** - Circuit breaker prevents overload
 - **Direct Integration** - Minimal wrappers around functionality
+- **Architectural Integrity** - Queue-based decoupling prevents cascade
 
 ## Security Considerations
 
 - Memories may contain sensitive information
 - Storage is local to the machine
 - No external API calls for storage
-- Pattern extraction filters system messages
+- Background processor runs with user permissions
+- Queue files readable only by user
 
 ## Future Enhancements
 
@@ -181,3 +302,4 @@ Potential improvements while maintaining simplicity:
 - Memory decay/aging for relevance
 - Cross-project memory sharing
 - Memory export/import capabilities
+- Distributed processing for multi-machine setups
