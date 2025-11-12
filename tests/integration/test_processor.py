@@ -61,7 +61,7 @@ async def test_processor_extracts_from_queue(clean_queue, mock_transcript):
     ):
         # Setup mocks
         mock_extractor = mock_extractor_cls.return_value
-        mock_extractor.extract_from_messages = AsyncMock(
+        mock_extractor.extract_from_messages_intelligent = AsyncMock(
             return_value={"memories": [{"content": "Test memory", "category": "learning"}]}
         )
 
@@ -73,7 +73,7 @@ async def test_processor_extracts_from_queue(clean_queue, mock_transcript):
 
         # Verify processing
         assert processed == 1
-        mock_extractor.extract_from_messages.assert_called_once()
+        mock_extractor.extract_from_messages_intelligent.assert_called_once()
         mock_store.add_memories_batch.assert_called_once()
 
 
@@ -110,12 +110,14 @@ async def test_processor_filters_sidechain(clean_queue, tmp_path):
     ):
         mock_extractor = mock_extractor_cls.return_value
 
-        async def capture_messages(messages, context):
+        async def capture_messages(messages, context, filter_sidechain):
             # Verify sidechain message was filtered out
             assert len(messages) == 3  # 4 original - 1 sidechain
+            # filter_sidechain should be False since filtering already happened
+            assert filter_sidechain is False
             return {"memories": []}
 
-        mock_extractor.extract_from_messages = AsyncMock(side_effect=capture_messages)
+        mock_extractor.extract_from_messages_intelligent = AsyncMock(side_effect=capture_messages)
 
         # Process
         await process_extraction_queue()
@@ -163,7 +165,7 @@ async def test_processor_removes_processed_items(clean_queue, mock_transcript):
         patch("amplifier.memory.processor.MemoryStore"),
     ):
         mock_extractor = mock_extractor_cls.return_value
-        mock_extractor.extract_from_messages = AsyncMock(return_value={"memories": []})
+        mock_extractor.extract_from_messages_intelligent = AsyncMock(return_value={"memories": []})
 
         # Process
         await process_extraction_queue()
