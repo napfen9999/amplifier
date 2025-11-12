@@ -160,7 +160,27 @@ MEMORY_STORAGE_DIR=.data/memories
 
 ## How It Works
 
-### Queue-Based Architecture
+### Extraction Workflows
+
+The memory system provides two extraction workflows:
+
+**1. Background Processing (Automatic)**
+- Transcripts queued automatically on session end
+- Background processor extracts memories asynchronously
+- No user interaction required
+- Runs continuously in background
+
+**2. Exit Command (Manual)**
+- User-initiated extraction via `/exit` command
+- Synchronous extraction with visible progress
+- Full control over when extraction happens
+- Runs in subprocess with progress UI
+
+Both workflows share the same extraction engine and produce identical results. The difference is **when** and **how** extraction happens, not **what** gets extracted.
+
+---
+
+### Queue-Based Architecture (Background Processing)
 
 The system decouples hook execution from memory extraction for performance and reliability:
 
@@ -172,6 +192,8 @@ Claude Code Session Ends
     Check Circuit Breaker
          ↓
     Queue Session for Extraction (<1ms)
+         ↓
+    Add to Transcript Tracking
          ↓
     Hook Returns Immediately
 
@@ -187,8 +209,48 @@ Background Processor Polls Queue
          ↓
     Store Memories
          ↓
+    Mark Transcript Processed
+         ↓
     Remove from Queue
 ```
+
+---
+
+### Manual Extraction (Exit Command)
+
+The exit command provides user-controlled extraction:
+
+```
+User Runs /exit
+         ↓
+    Check for Unprocessed Transcripts
+         ↓
+    Prompt: "Extract memories? (Y/n)"
+         ↓
+    [If Yes]
+         ↓
+    Spawn Extraction Worker (subprocess)
+         ↓
+    Display Progress UI (terminal)
+         ↓
+    Worker Processes Transcripts
+         ↓
+    Store Memories
+         ↓
+    Mark Transcripts Processed
+         ↓
+    Show Completion Summary
+         ↓
+    Exit Claude Code
+```
+
+**Key benefits**:
+- Full visibility into extraction progress
+- Synchronous completion before exit
+- No hidden background processing
+- User controls timing
+
+See [Exit Command Guide](EXIT_COMMAND.md) for complete usage documentation.
 
 ### 1. Session End (Stop Hook)
 
@@ -265,6 +327,89 @@ The extraction queue is stored at `.data/extraction_queue.jsonl`:
 {"session_id": "abc123", "transcript_path": "/path/to/transcript.jsonl", "timestamp": "2025-11-11T14:30:00", "hook_event": "Stop"}
 {"session_id": "def456", "transcript_path": "/path/to/transcript.jsonl", "timestamp": "2025-11-11T14:35:00", "hook_event": "Stop"}
 ```
+
+## Commands
+
+### Exit Command
+
+Extract memories when ending a Claude Code session:
+
+```bash
+/exit
+```
+
+**What it does**:
+1. Checks for unprocessed transcripts
+2. Prompts: "Extract memories before exit? (Y/n)"
+3. If Yes: Runs synchronous extraction with progress UI
+4. Shows completion summary
+5. Exits Claude Code
+
+**When to use**:
+- Want immediate extraction before leaving
+- Need to verify extraction completes
+- Prefer visible progress over background processing
+
+See [Exit Command Guide](EXIT_COMMAND.md) for complete documentation.
+
+---
+
+### Cleanup Command
+
+Manage extraction state and recovery:
+
+```bash
+/cleanup
+```
+
+**What it does**:
+- Shows extraction status (running/completed/crashed/cancelled)
+- Offers to resume interrupted extractions
+- Cleans up completed state
+- Provides recovery options after crashes
+
+**When to use**:
+- After interrupted extraction (Ctrl+C, crash, reboot)
+- Want to check extraction status
+- Need to resume incomplete work
+- Clean up old state files
+
+See [Cleanup Command Guide](CLEANUP_COMMAND.md) for complete documentation.
+
+---
+
+## Transcript Tracking
+
+The system tracks all transcripts from creation through processing:
+
+**Tracking file**: `.data/transcripts.json`
+
+**Automatically tracks**:
+- When transcripts are created (session end)
+- Which are processed vs. pending
+- Memory count for each transcript
+- Processing timestamps
+
+**Used by**:
+- `/exit` command (counts unprocessed transcripts)
+- Extraction worker (identifies what to process)
+- `/cleanup` command (shows extraction history)
+
+**Example record**:
+```json
+{
+  "session_id": "abc123",
+  "transcript_path": "/path/to/transcript.jsonl",
+  "created_at": "2025-11-12T15:30:00",
+  "processed": true,
+  "processed_at": "2025-11-12T15:35:00",
+  "memories_extracted": 15
+}
+```
+
+See [Transcript Tracking Guide](TRANSCRIPT_TRACKING.md) for technical details.
+
+---
 
 ## Background Processor
 
