@@ -1,19 +1,17 @@
 """Tests for extraction worker subprocess"""
 
 import tempfile
-from datetime import datetime
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
+from unittest.mock import patch
 
 import pytest
 
 from amplifier.memory.extraction_worker import run_extraction_worker
 from amplifier.memory.processor import ExtractionResult
-from amplifier.memory.state_tracker import load_extraction_state, save_extraction_state
-from amplifier.memory.transcript_tracker import (
-    add_transcript_record,
-    get_transcript_by_session,
-)
+from amplifier.memory.state_tracker import load_extraction_state
+from amplifier.memory.transcript_tracker import add_transcript_record
+from amplifier.memory.transcript_tracker import get_transcript_by_session
 
 
 @pytest.fixture
@@ -63,9 +61,7 @@ def test_run_extraction_worker_single_transcript(temp_data_dir):
 
     # Mock the processor
     with patch("amplifier.memory.extraction_worker.process_transcript") as mock_process:
-        mock_process.return_value = ExtractionResult(
-            session_id="test123", memories_extracted=5, success=True
-        )
+        mock_process.return_value = ExtractionResult(session_id="test123", memories_extracted=5, success=True)
 
         # Mock time.sleep to speed up test
         with patch("amplifier.memory.extraction_worker.time.sleep"):
@@ -179,9 +175,17 @@ def test_run_extraction_worker_continues_after_error(temp_data_dir):
     assert stats["errors"] == 1
 
     # Verify only successful transcripts marked as processed
-    assert get_transcript_by_session("test1").processed is True
-    assert get_transcript_by_session("test2").processed is False
-    assert get_transcript_by_session("test3").processed is True
+    test1 = get_transcript_by_session("test1")
+    assert test1 is not None
+    assert test1.processed is True
+
+    test2 = get_transcript_by_session("test2")
+    assert test2 is not None
+    assert test2.processed is False
+
+    test3 = get_transcript_by_session("test3")
+    assert test3 is not None
+    assert test3.processed is True
 
 
 def test_run_extraction_worker_updates_state(temp_data_dir):
@@ -195,14 +199,12 @@ def test_run_extraction_worker_updates_state(temp_data_dir):
 
     # Mock processor
     with patch("amplifier.memory.extraction_worker.process_transcript") as mock_process:
-        mock_process.return_value = ExtractionResult(
-            session_id="state", memories_extracted=5, success=True
-        )
+        mock_process.return_value = ExtractionResult(session_id="state", memories_extracted=5, success=True)
 
         # Mock time.sleep
         with patch("amplifier.memory.extraction_worker.time.sleep"):
             # Run worker
-            stats = run_extraction_worker(transcripts_dir)
+            run_extraction_worker(transcripts_dir)
 
     # Verify final state
     state = load_extraction_state()
@@ -227,22 +229,20 @@ def test_run_extraction_worker_terminal_ui_integration(temp_data_dir):
 
     # Mock processor
     with patch("amplifier.memory.extraction_worker.process_transcript") as mock_process:
-        mock_process.return_value = ExtractionResult(
-            session_id="ui", memories_extracted=3, success=True
-        )
+        mock_process.return_value = ExtractionResult(session_id="ui", memories_extracted=3, success=True)
 
         # Mock TerminalUI to track calls
-        with patch("amplifier.memory.extraction_worker.TerminalUI") as MockUI:
+        with patch("amplifier.memory.extraction_worker.TerminalUI") as mock_ui:
             mock_ui_instance = MagicMock()
-            MockUI.return_value.__enter__.return_value = mock_ui_instance
+            mock_ui.return_value.__enter__.return_value = mock_ui_instance
 
             # Mock time.sleep
             with patch("amplifier.memory.extraction_worker.time.sleep"):
                 # Run worker
-                stats = run_extraction_worker(transcripts_dir)
+                run_extraction_worker(transcripts_dir)
 
     # Verify UI was used
-    MockUI.assert_called_once_with(total_transcripts=1)
+    mock_ui.assert_called_once_with(total_transcripts=1)
 
     # Verify update() was called multiple times
     assert mock_ui_instance.update.call_count > 0
@@ -262,9 +262,7 @@ def test_run_extraction_worker_logging(temp_data_dir):
 
     # Mock processor
     with patch("amplifier.memory.extraction_worker.process_transcript") as mock_process:
-        mock_process.return_value = ExtractionResult(
-            session_id="log", memories_extracted=1, success=True
-        )
+        mock_process.return_value = ExtractionResult(session_id="log", memories_extracted=1, success=True)
 
         # Mock logger to capture calls
         with patch("amplifier.memory.extraction_worker.get_extraction_logger") as mock_logger:
@@ -274,7 +272,7 @@ def test_run_extraction_worker_logging(temp_data_dir):
             # Mock time.sleep
             with patch("amplifier.memory.extraction_worker.time.sleep"):
                 # Run worker
-                stats = run_extraction_worker(transcripts_dir)
+                run_extraction_worker(transcripts_dir)
 
     # Verify logging calls
     assert logger_instance.info.call_count > 0
@@ -296,9 +294,7 @@ def test_run_extraction_worker_duration_tracking(temp_data_dir):
 
     # Mock processor
     with patch("amplifier.memory.extraction_worker.process_transcript") as mock_process:
-        mock_process.return_value = ExtractionResult(
-            session_id="time", memories_extracted=1, success=True
-        )
+        mock_process.return_value = ExtractionResult(session_id="time", memories_extracted=1, success=True)
 
         # Mock time.sleep (don't actually sleep)
         with patch("amplifier.memory.extraction_worker.time.sleep"):
