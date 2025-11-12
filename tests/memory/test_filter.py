@@ -1,6 +1,5 @@
 """Tests for message filtering"""
 
-
 from amplifier.memory.filter import filter_sidechain_messages
 from amplifier.memory.filter import is_subagent_message
 

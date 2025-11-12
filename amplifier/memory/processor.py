@@ -72,9 +72,13 @@ async def process_extraction_queue() -> int:
                 remove_from_queue(item.session_id)
                 continue
 
-            # Extract memories
+            # Extract memories using intelligent extraction
             logger.info(f"[PROCESSOR] Extracting from {len(messages)} messages")
-            result = await extractor.extract_from_messages(messages, context=None)
+            result = await extractor.extract_from_messages_intelligent(
+                messages,
+                context=None,
+                filter_sidechain=False,  # Already filtered at line 68
+            )
 
             # Store memories
             if result and "memories" in result:

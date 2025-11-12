@@ -23,11 +23,29 @@ DEFAULT_STORAGE_DIR = ".data/memories"
 def get_memory_storage_dir() -> Path:
     """Get memory storage directory from environment variable or default
 
+    Uses CLAUDE_PROJECT_DIR as base for relative paths when available,
+    ensuring correct path resolution when Amplifier is used as a submodule.
+
     Returns:
         Path to memory storage directory (defaults to .data/memories)
     """
     storage_dir = os.getenv("MEMORY_STORAGE_DIR", DEFAULT_STORAGE_DIR)
-    return Path(storage_dir)
+    path = Path(storage_dir)
+
+    # If path is relative, resolve relative to CLAUDE_PROJECT_DIR
+    if not path.is_absolute():
+        project_dir = os.getenv("CLAUDE_PROJECT_DIR")
+        if project_dir:
+            path = Path(project_dir) / path
+            logger.info(f"[MEMORY CONFIG] Resolving relative path with CLAUDE_PROJECT_DIR: {path}")
+        else:
+            # Fallback to current working directory
+            path = path.resolve()
+            logger.info(f"[MEMORY CONFIG] No CLAUDE_PROJECT_DIR, using cwd: {path}")
+    else:
+        logger.info(f"[MEMORY CONFIG] Using absolute path: {path}")
+
+    return path
 
 
 def get_max_memories() -> int:

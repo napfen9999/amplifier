@@ -37,6 +37,8 @@ class MemoryExtractor:
 
     def __init__(self):
         """Initialize the extractor and check for required dependencies"""
+        import os
+
         logger.info("[EXTRACTION] Initializing MemoryExtractor")
         # Import and load configuration
         from amplifier.extraction.config import get_config
@@ -56,6 +58,16 @@ class MemoryExtractor:
                 "Claude CLI not found. Memory extraction requires Claude CLI. "
                 "Install with: npm install -g @anthropic-ai/claude-code"
             )
+
+        # Check if API key is configured
+        api_key = os.getenv("ANTHROPIC_API_KEY")
+        if not api_key:
+            logger.warning(
+                "[EXTRACTION] ANTHROPIC_API_KEY not set. Memory extraction will fail. "
+                "Set ANTHROPIC_API_KEY in your .env file or use Claude Code subscription if available."
+            )
+        else:
+            logger.info("[EXTRACTION] ANTHROPIC_API_KEY found")
 
         logger.info("[EXTRACTION] Claude Code SDK and CLI verified - ready for extraction")
 
@@ -80,6 +92,9 @@ class MemoryExtractor:
     async def extract_from_messages(self, messages: list[dict[str, Any]], context: str | None = None) -> dict[str, Any]:
         """Extract memories from conversation messages using Claude Code SDK
 
+        ⚠️ DEPRECATED: Use extract_from_messages_intelligent() for better coverage
+        of large sessions. This method only processes the last N messages.
+
         Args:
             messages: List of conversation messages
             context: Optional context string
@@ -90,6 +105,10 @@ class MemoryExtractor:
         Raises:
             RuntimeError: If no messages provided or extraction fails
         """
+        logger.warning(
+            "[EXTRACTION] Using legacy extract_from_messages - consider using "
+            "extract_from_messages_intelligent() for better coverage of large sessions"
+        )
         logger.info(f"[EXTRACTION] extract_from_messages called with {len(messages)} messages")
 
         if not messages:
@@ -135,6 +154,59 @@ class MemoryExtractor:
         # Use existing extraction logic
         return await self.extract_from_messages(messages, context)
 
+    async def extract_from_messages_intelligent(
+        self,
+        messages: list[dict[str, Any]],
+        context: str | None = None,
+        filter_sidechain: bool = True,
+    ) -> dict[str, Any]:
+        """Extract memories using intelligent two-pass sampling
+
+        Uses LLM-driven triage to identify important message ranges,
+        then performs deep extraction only from those ranges.
+
+        This method provides better coverage for large sessions
+        without requiring manual configuration.
+
+        Args:
+            messages: Full message list from session
+            context: Optional context string
+            filter_sidechain: Whether to remove sidechain messages (default: True)
+
+        Returns:
+            Extraction result dictionary with memories and metadata
+
+        Raises:
+            RuntimeError: If extraction fails after retries
+        """
+        from amplifier.memory.filter import filter_sidechain_messages
+        from amplifier.memory.intelligent_sampling import two_pass_extraction
+
+        logger.info(f"[EXTRACTION] extract_from_messages_intelligent called with {len(messages)} messages")
+
+        # Check if intelligent sampling is enabled
+        if not self.config.intelligent_sampling_enabled:
+            logger.info("[EXTRACTION] Intelligent sampling disabled, using standard extraction")
+            return await self.extract_from_messages(messages, context)
+
+        # Apply sidechain filtering if requested
+        if filter_sidechain:
+            messages = filter_sidechain_messages(messages)
+            logger.info(f"[EXTRACTION] Filtered to {len(messages)} main-chain messages")
+
+        if not messages:
+            raise RuntimeError("No messages remaining after filtering")
+
+        # Use two-pass intelligent extraction
+        result = await two_pass_extraction(messages, self)
+
+        # Add context to metadata if provided
+        if context and "metadata" in result:
+            result["metadata"]["context"] = context
+
+        logger.info(f"[EXTRACTION] Intelligent extraction completed: {len(result.get('memories', []))} memories")
+        return result
+
     def _format_messages(self, messages: list[dict[str, Any]]) -> str:
         """Format messages for extraction - optimized for performance"""
         formatted = []
@@ -147,12 +219,33 @@ class MemoryExtractor:
         logger.info(f"[EXTRACTION] Processing {len(messages_to_process)} of {len(messages)} total messages")
 
         for msg in messages_to_process:
-            role = msg.get("role", "unknown")
+            # Handle Claude Code transcript format: {"type": "user", "message": {"role": "user", "content": [...]}}
+            # Also handle simple format: {"role": "user", "content": "..."}
+            if "message" in msg and isinstance(msg["message"], dict):
+                # Claude Code transcript format
+                inner_message = msg["message"]
+                role = inner_message.get("role", msg.get("type", "unknown"))
+                content = inner_message.get("content", "")
+            else:
+                # Simple format
+                role = msg.get("role", msg.get("type", "unknown"))
+                content = msg.get("content", "")
+
             # Skip non-conversation roles early
             if role not in ["user", "assistant"]:
                 continue
 
-            content = msg.get("content", "")
+            # Handle content as list (Claude Code format) or string
+            if isinstance(content, list):
+                # Extract text from content blocks
+                text_parts = []
+                for block in content:
+                    if isinstance(block, dict) and block.get("type") == "text":
+                        text_parts.append(block.get("text", ""))
+                content = " ".join(text_parts)
+            elif not isinstance(content, str):
+                content = str(content)
+
             if not content:
                 continue
 
@@ -303,6 +396,9 @@ Return ONLY valid JSON."""
                         logger.warning("[EXTRACTION] Empty response from Claude Code SDK")
                         return None
 
+                    # Log response for debugging (using INFO to ensure it's visible)
+                    logger.info(f"[EXTRACTION] Raw response: {response}")
+
                     # Clean and parse JSON
                     cleaned = response.strip()
                     if cleaned.startswith("```json"):
@@ -314,6 +410,7 @@ Return ONLY valid JSON."""
                     cleaned = cleaned.strip()
 
                     logger.info("[EXTRACTION] Parsing JSON response")
+                    logger.info(f"[EXTRACTION] Cleaned response: {cleaned}")
                     data = json.loads(cleaned)
                     data["metadata"] = {"extraction_method": "claude_sdk", "timestamp": datetime.now().isoformat()}
 
@@ -326,11 +423,41 @@ Return ONLY valid JSON."""
             )
         except json.JSONDecodeError as e:
             logger.error(f"[EXTRACTION] Failed to parse extraction response: {e}")
+            # Check if response looks like an error message
+            if response and len(response) < 300:
+                logger.error(f"[EXTRACTION] Response was: {response}")
+                if "credit" in response.lower() or "balance" in response.lower():
+                    logger.error(
+                        "[EXTRACTION] ⚠️  INSUFFICIENT CREDITS: Your Anthropic API account has insufficient credits. "
+                        "Please add credits at https://console.anthropic.com/ or check your billing settings."
+                    )
+                elif "api" in response.lower() and "key" in response.lower():
+                    logger.error(
+                        "[EXTRACTION] ⚠️  INVALID API KEY: Your ANTHROPIC_API_KEY is invalid or not set correctly. "
+                        "Check your .env file and ensure the key is valid."
+                    )
         except Exception as e:
-            logger.error(f"[EXTRACTION] Claude Code SDK extraction error: {e}")
-            import traceback
+            error_message = str(e)
+            logger.error(f"[EXTRACTION] Claude Code SDK extraction error: {error_message}")
 
-            logger.error(f"[EXTRACTION] Traceback: {traceback.format_exc()}")
+            # Provide helpful error messages for common issues
+            if "authentication" in error_message.lower() or "api key" in error_message.lower():
+                logger.error(
+                    "[EXTRACTION] ⚠️  AUTHENTICATION ERROR: Check your ANTHROPIC_API_KEY in .env file. "
+                    "Get a key at https://console.anthropic.com/settings/keys"
+                )
+            elif "rate limit" in error_message.lower():
+                logger.error(
+                    "[EXTRACTION] ⚠️  RATE LIMIT: Too many requests. The system will retry later automatically."
+                )
+            elif "insufficient" in error_message.lower() or "credit" in error_message.lower():
+                logger.error(
+                    "[EXTRACTION] ⚠️  INSUFFICIENT CREDITS: Add credits at https://console.anthropic.com/settings/plans"
+                )
+            else:
+                import traceback
+
+                logger.error(f"[EXTRACTION] Traceback: {traceback.format_exc()}")
 
         return None
 

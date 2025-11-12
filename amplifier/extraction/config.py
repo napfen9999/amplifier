@@ -44,6 +44,11 @@ class MemoryExtractionConfig(BaseSettings):
         default=10, description="Maximum number of memories to extract per session"
     )
 
+    # Intelligent sampling configuration
+    intelligent_sampling_enabled: bool = Field(
+        default=True, description="Use intelligent two-pass sampling (recommended)"
+    )
+
     # Storage configuration (for future use)
     memory_storage_dir: Path = Field(
         default=Path(".data/memories"), description="Directory for storing extracted memories"

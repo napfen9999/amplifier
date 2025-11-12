@@ -6,13 +6,31 @@ LLM-based extraction processing.
 
 import json
 import logging
+import os
 from dataclasses import asdict
 from dataclasses import dataclass
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-QUEUE_FILE = Path(".data/extraction_queue.jsonl")
+
+def get_queue_file() -> Path:
+    """Get queue file path, resolving relative to CLAUDE_PROJECT_DIR if available"""
+    queue_path = Path(".data/extraction_queue.jsonl")
+
+    # If CLAUDE_PROJECT_DIR is set, use it as base for relative path
+    project_dir = os.getenv("CLAUDE_PROJECT_DIR")
+    if project_dir:
+        queue_path = Path(project_dir) / queue_path
+        logger.debug(f"[QUEUE] Using queue file: {queue_path} (from CLAUDE_PROJECT_DIR)")
+    else:
+        queue_path = queue_path.resolve()
+        logger.debug(f"[QUEUE] Using queue file: {queue_path} (from cwd)")
+
+    return queue_path
+
+
+QUEUE_FILE = get_queue_file()
 
 
 @dataclass

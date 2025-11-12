@@ -1,6 +1,5 @@
 """Tests for circuit breaker throttle protection"""
 
-
 import pytest
 
 from amplifier.memory.circuit_breaker import FREQUENCY_THRESHOLD

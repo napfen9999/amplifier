@@ -1,6 +1,5 @@
 """Integration tests for hook to queue flow"""
 
-
 import pytest
 
 from amplifier.memory.circuit_breaker import FREQUENCY_THRESHOLD
