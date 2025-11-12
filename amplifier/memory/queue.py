@@ -1,50 +1,23 @@
-"""Extraction queue management
+"""JSONL-based extraction queue for deferred memory processing.
 
-JSONL-based queue for pending memory extractions. Decouples hook execution from
-LLM-based extraction processing.
+Simple file-based queue using JSONL format. Each line is a queued extraction task
+that will be processed asynchronously by the extraction worker.
 """
 
 import json
 import logging
-import os
 from dataclasses import asdict
 from dataclasses import dataclass
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-
-def get_queue_file() -> Path:
-    """Get queue file path, resolving relative to CLAUDE_PROJECT_DIR if available"""
-    queue_path = Path(".data/extraction_queue.jsonl")
-
-    # If CLAUDE_PROJECT_DIR is set, use it as base for relative path
-    project_dir = os.getenv("CLAUDE_PROJECT_DIR")
-    if project_dir:
-        queue_path = Path(project_dir) / queue_path
-        logger.debug(f"[QUEUE] Using queue file: {queue_path} (from CLAUDE_PROJECT_DIR)")
-    else:
-        queue_path = queue_path.resolve()
-        logger.debug(f"[QUEUE] Using queue file: {queue_path} (from cwd)")
-
-    return queue_path
-
-
-QUEUE_FILE = get_queue_file()
+QUEUE_FILE = Path(".data/extraction_queue.jsonl")
 
 
 @dataclass
 class QueuedExtraction:
-    """Item in extraction queue
-
-    Attributes:
-        session_id: Unique session identifier
-        transcript_path: Path to JSONL transcript file
-        timestamp: ISO8601 timestamp when queued
-        hook_event: Hook event type ("Stop" or "SubagentStop")
-        retries: Number of processing attempts
-        last_error: Last error message if processing failed
-    """
+    """Extraction task queued for asynchronous processing."""
 
     session_id: str
     transcript_path: str
@@ -55,33 +28,33 @@ class QueuedExtraction:
 
 
 def queue_extraction(item: QueuedExtraction) -> None:
-    """Append item to extraction queue
-
-    Non-blocking operation that appends to JSONL file. Creates directory
-    structure if needed.
+    """Append extraction task to queue file.
 
     Args:
-        item: Extraction item to queue
+        item: Extraction task to queue
+
+    Non-blocking operation that appends to JSONL file.
+    Creates directory structure if needed.
     """
     QUEUE_FILE.parent.mkdir(parents=True, exist_ok=True)
 
-    with open(QUEUE_FILE, "a") as f:
+    with QUEUE_FILE.open("a") as f:
         f.write(json.dumps(asdict(item)) + "\n")
 
-    logger.info(f"[QUEUE] Queued {item.session_id}")
+    logger.info(f"Queued extraction for session {item.session_id}")
 
 
 def get_queued_items() -> list[QueuedExtraction]:
-    """Read all pending items from queue
+    """Read all queued extraction tasks.
 
     Returns:
-        List of queued extraction items (empty if no queue file)
+        List of queued items, empty if queue file doesn't exist
     """
     if not QUEUE_FILE.exists():
         return []
 
     items = []
-    with open(QUEUE_FILE) as f:
+    with QUEUE_FILE.open() as f:
         for line in f:
             if line.strip():
                 data = json.loads(line)
@@ -91,37 +64,31 @@ def get_queued_items() -> list[QueuedExtraction]:
 
 
 def remove_from_queue(session_id: str) -> None:
-    """Remove item from queue after processing
-
-    Rewrites queue file excluding the specified session.
+    """Remove item from queue by session_id.
 
     Args:
         session_id: Session ID to remove
+
+    Rewrites queue file without the matching item.
     """
     if not QUEUE_FILE.exists():
         return
 
-    # Read all items except the one to remove
-    remaining = []
-    with open(QUEUE_FILE) as f:
-        for line in f:
-            if line.strip():
-                data = json.loads(line)
-                if data.get("session_id") != session_id:
-                    remaining.append(line)
+    items = get_queued_items()
+    remaining = [item for item in items if item.session_id != session_id]
 
-    # Rewrite queue
-    with open(QUEUE_FILE, "w") as f:
-        f.writelines(remaining)
+    with QUEUE_FILE.open("w") as f:
+        for item in remaining:
+            f.write(json.dumps(asdict(item)) + "\n")
 
-    logger.info(f"[QUEUE] Removed {session_id}")
+    logger.info(f"Removed session {session_id} from queue")
 
 
 def clear_queue() -> None:
-    """Clear entire queue
+    """Delete queue file.
 
-    Deletes queue file. Used for testing and maintenance.
+    For testing and maintenance.
     """
     if QUEUE_FILE.exists():
         QUEUE_FILE.unlink()
-    logger.info("[QUEUE] Cleared")
+        logger.info("Cleared extraction queue")

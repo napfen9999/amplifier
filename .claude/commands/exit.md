@@ -2,7 +2,7 @@
 description: Exit with optional memory extraction
 category: memory-system
 allowed-tools: Bash, Read, BashOutput
-argument-hint: (No arguments) Prompts to extract memories before exit
+argument-hint: (No arguments) Prompts to extract | 'force' or 'now' to skip checks
 ---
 
 # Claude Command: Exit
@@ -21,6 +21,12 @@ When the user runs `/exit`, the command:
 4. **If No**: Exits immediately
 5. **Shows summary** of memories extracted (if extraction ran)
 
+**Force Exit Mode**: `/exit force` or `/exit now` skips all checks and exits immediately.
+This is useful when:
+- Session is at context limit and needs compact
+- Memory system is not configured
+- User just wants to exit without any prompts
+
 ## Understanding User Intent
 
 This command is typically used when:
@@ -30,18 +36,52 @@ This command is typically used when:
 
 ## Implementation Approach
 
-### Step 1: Check for Unprocessed Transcripts
+### Step 0: Check for Force Exit
 
-Use the transcript tracking system to identify transcripts that haven't been processed for memory extraction:
+If user passed 'force' or 'now' as argument, exit immediately without any checks:
+
+```
+User: /exit force
+→ Exit immediately, no prompts, no checks
+```
+
+### Step 1: Check for Unprocessed Transcripts (Robust Version)
+
+Use the transcript tracking system with robust error handling:
 
 ```bash
-python -c "
-from amplifier.memory.transcript_tracker import load_transcripts
-transcripts = load_transcripts()
-unprocessed = [t for t in transcripts if not t.get('processed', False)]
-print(len(unprocessed))
+python3 -c "
+import sys
+import os
+
+# Ensure project root and amplifier submodule are in path
+project_root = os.getcwd()
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+# Also add amplifier/ submodule if it exists (for projects using Amplifier as submodule)
+amplifier_path = os.path.join(project_root, 'amplifier')
+if os.path.isdir(amplifier_path) and amplifier_path not in sys.path:
+    sys.path.insert(0, amplifier_path)
+
+try:
+    from amplifier.memory.transcript_tracker import load_transcripts
+    transcripts = load_transcripts()
+    unprocessed = [t for t in transcripts if not t.get('processed', False)]
+    print(len(unprocessed))
+except ImportError:
+    # Memory system not installed/configured - graceful fallback
+    print('0')
+except Exception:
+    # Any other error - fail safe, don't block exit
+    print('0')
 "
 ```
+
+**Error Handling**:
+- If Python import fails → Assume 0 unprocessed (graceful degradation)
+- If any exception → Assume 0 unprocessed (don't block exit)
+- Result: User can ALWAYS exit, even if memory system broken
 
 If zero unprocessed transcripts → Skip extraction prompt, exit immediately
 

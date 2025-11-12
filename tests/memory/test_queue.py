@@ -1,7 +1,6 @@
-"""Tests for extraction queue management"""
+"""Tests for JSONL-based extraction queue."""
 
 import json
-from datetime import datetime
 
 import pytest
 
@@ -13,136 +12,136 @@ from amplifier.memory.queue import queue_extraction
 from amplifier.memory.queue import remove_from_queue
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def clean_queue():
-    """Ensure queue is clean before and after test"""
+    """Clean queue before and after each test."""
     clear_queue()
     yield
     clear_queue()
 
 
-def test_queue_extraction_appends(clean_queue):
-    """Verify queue_extraction() writes to JSONL file"""
-    item = QueuedExtraction(
-        session_id="test-123",
-        transcript_path="/path/to/transcript.jsonl",
-        timestamp=datetime.now().isoformat(),
+def test_queue_extraction_appends():
+    """Test that queue_extraction appends items to JSONL file."""
+    item1 = QueuedExtraction(
+        session_id="abc123",
+        transcript_path="/path/to/transcript1.jsonl",
+        timestamp="2025-11-11T14:30:00",
         hook_event="Stop",
     )
+    item2 = QueuedExtraction(
+        session_id="def456",
+        transcript_path="/path/to/transcript2.jsonl",
+        timestamp="2025-11-11T14:35:00",
+        hook_event="SubagentStop",
+    )
 
-    queue_extraction(item)
+    queue_extraction(item1)
+    queue_extraction(item2)
 
-    # Verify file exists and contains data
     assert QUEUE_FILE.exists()
 
-    with open(QUEUE_FILE) as f:
+    with QUEUE_FILE.open() as f:
         lines = f.readlines()
-        assert len(lines) == 1
 
-        data = json.loads(lines[0])
-        assert data["session_id"] == "test-123"
-        assert data["hook_event"] == "Stop"
-
-
-def test_queue_extraction_appends_multiple(clean_queue):
-    """Verify multiple items can be queued"""
-    for i in range(3):
-        item = QueuedExtraction(
-            session_id=f"test-{i}",
-            transcript_path=f"/path/to/transcript-{i}.jsonl",
-            timestamp=datetime.now().isoformat(),
-            hook_event="Stop",
-        )
-        queue_extraction(item)
-
-    # Verify all items queued
-    with open(QUEUE_FILE) as f:
-        lines = f.readlines()
-        assert len(lines) == 3
+    assert len(lines) == 2
+    assert json.loads(lines[0])["session_id"] == "abc123"
+    assert json.loads(lines[1])["session_id"] == "def456"
 
 
-def test_get_queued_items_returns_all(clean_queue):
-    """Verify get_queued_items() returns all items"""
-    # Queue 3 items
-    for i in range(3):
-        item = QueuedExtraction(
-            session_id=f"test-{i}",
-            transcript_path=f"/path/to/transcript-{i}.jsonl",
-            timestamp=datetime.now().isoformat(),
-            hook_event="Stop",
-        )
-        queue_extraction(item)
+def test_get_queued_items_returns_all():
+    """Test that get_queued_items returns all items in queue."""
+    item1 = QueuedExtraction(
+        session_id="abc123",
+        transcript_path="/path/to/transcript1.jsonl",
+        timestamp="2025-11-11T14:30:00",
+        hook_event="Stop",
+    )
+    item2 = QueuedExtraction(
+        session_id="def456",
+        transcript_path="/path/to/transcript2.jsonl",
+        timestamp="2025-11-11T14:35:00",
+        hook_event="SubagentStop",
+        retries=2,
+        last_error="Connection timeout",
+    )
 
-    # Retrieve items
+    queue_extraction(item1)
+    queue_extraction(item2)
+
     items = get_queued_items()
 
-    assert len(items) == 3
-    assert items[0].session_id == "test-0"
-    assert items[1].session_id == "test-1"
-    assert items[2].session_id == "test-2"
+    assert len(items) == 2
+    assert items[0].session_id == "abc123"
+    assert items[0].hook_event == "Stop"
+    assert items[0].retries == 0
+    assert items[1].session_id == "def456"
+    assert items[1].retries == 2
+    assert items[1].last_error == "Connection timeout"
 
 
-def test_get_queued_items_empty_when_no_file(clean_queue):
-    """Verify get_queued_items() returns empty list when no queue file"""
+def test_get_queued_items_empty_when_no_file():
+    """Test that get_queued_items returns empty list when queue file doesn't exist."""
+    assert not QUEUE_FILE.exists()
     items = get_queued_items()
     assert items == []
 
 
-def test_remove_from_queue_deletes(clean_queue):
-    """Verify remove_from_queue() removes specific item"""
-    # Queue 3 items
-    for i in range(3):
-        item = QueuedExtraction(
-            session_id=f"test-{i}",
-            transcript_path=f"/path/to/transcript-{i}.jsonl",
-            timestamp=datetime.now().isoformat(),
-            hook_event="Stop",
-        )
-        queue_extraction(item)
+def test_remove_from_queue_deletes():
+    """Test that remove_from_queue removes matching item."""
+    item1 = QueuedExtraction(
+        session_id="abc123",
+        transcript_path="/path/to/transcript1.jsonl",
+        timestamp="2025-11-11T14:30:00",
+        hook_event="Stop",
+    )
+    item2 = QueuedExtraction(
+        session_id="def456",
+        transcript_path="/path/to/transcript2.jsonl",
+        timestamp="2025-11-11T14:35:00",
+        hook_event="SubagentStop",
+    )
+    item3 = QueuedExtraction(
+        session_id="ghi789",
+        transcript_path="/path/to/transcript3.jsonl",
+        timestamp="2025-11-11T14:40:00",
+        hook_event="Stop",
+    )
 
-    # Remove middle item
-    remove_from_queue("test-1")
+    queue_extraction(item1)
+    queue_extraction(item2)
+    queue_extraction(item3)
 
-    # Verify remaining items
+    remove_from_queue("def456")
+
     items = get_queued_items()
     assert len(items) == 2
-    assert items[0].session_id == "test-0"
-    assert items[1].session_id == "test-2"
+    assert items[0].session_id == "abc123"
+    assert items[1].session_id == "ghi789"
 
 
-def test_remove_from_queue_handles_missing_session(clean_queue):
-    """Verify remove_from_queue() handles non-existent session gracefully"""
+def test_remove_from_queue_no_error_when_empty():
+    """Test that remove_from_queue doesn't error when queue is empty."""
+    assert not QUEUE_FILE.exists()
+    remove_from_queue("nonexistent")
+
+
+def test_clear_queue_works():
+    """Test that clear_queue deletes the queue file."""
     item = QueuedExtraction(
-        session_id="test-123",
+        session_id="abc123",
         transcript_path="/path/to/transcript.jsonl",
-        timestamp=datetime.now().isoformat(),
+        timestamp="2025-11-11T14:30:00",
         hook_event="Stop",
     )
+
     queue_extraction(item)
-
-    # Remove non-existent session (should not error)
-    remove_from_queue("non-existent")
-
-    # Original item should still exist
-    items = get_queued_items()
-    assert len(items) == 1
-
-
-def test_clear_queue_works(clean_queue):
-    """Verify clear_queue() deletes queue file"""
-    # Queue an item
-    item = QueuedExtraction(
-        session_id="test-123",
-        transcript_path="/path/to/transcript.jsonl",
-        timestamp=datetime.now().isoformat(),
-        hook_event="Stop",
-    )
-    queue_extraction(item)
-
     assert QUEUE_FILE.exists()
 
-    # Clear queue
     clear_queue()
-
     assert not QUEUE_FILE.exists()
-    assert get_queued_items() == []
+
+
+def test_clear_queue_no_error_when_empty():
+    """Test that clear_queue doesn't error when file doesn't exist."""
+    assert not QUEUE_FILE.exists()
+    clear_queue()
