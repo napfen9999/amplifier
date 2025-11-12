@@ -68,6 +68,25 @@ async def main():
 
         input_data = json.loads(raw_input)
 
+        # Extract tool usage info for DDD tracking
+        tool_name = input_data.get("tool_name")
+        tool_params = input_data.get("parameters", {})
+
+        # DDD file modification tracking (if DDD session active)
+        if tool_name in ["Edit", "Write"]:
+            file_path = tool_params.get("file_path")
+            if file_path:
+                try:
+                    sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "tools"))
+                    from ddd_hooks import handle_post_tool_use_edit
+                    from ddd_hooks import is_ddd_session_active
+
+                    if is_ddd_session_active():
+                        handle_post_tool_use_edit(file_path)
+                        logger.info(f"DDD file modification logged: {file_path}")
+                except Exception as e:
+                    logger.warning(f"DDD file tracking failed (non-critical): {e}")
+
         # Extract message
         message = input_data.get("message", {})
         role = message.get("role", "")

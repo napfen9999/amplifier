@@ -347,6 +347,19 @@ def main():
             filename = Path(exported_path).name
             output["systemMessage"] = f"Transcript exported to .data/transcripts/{filename}"
 
+        # DDD emergency checkpoint (if DDD session active)
+        # Import DDD hooks - defensive to not break if missing
+        try:
+            sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "tools"))
+            from ddd_hooks import handle_pre_compact
+
+            ddd_result = handle_pre_compact()
+            if ddd_result.get("metadata", {}).get("checkpoint_created"):
+                logger.info("DDD emergency checkpoint created")
+                output["metadata"]["ddd_checkpoint"] = ddd_result.get("metadata", {})
+        except Exception as e:
+            logger.warning(f"DDD checkpoint creation failed (non-critical): {e}")
+
         json.dump(output, sys.stdout)
         logger.info("PreCompact export hook completed")
 
