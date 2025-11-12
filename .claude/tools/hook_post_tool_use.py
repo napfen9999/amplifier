@@ -9,12 +9,30 @@ import json
 import sys
 from pathlib import Path
 
+# Get the amplifier root directory (3 levels up from this file)
+amplifier_root = Path(__file__).resolve().parent.parent.parent
+
+# Add amplifier venv to Python path FIRST (so we get claude-code-sdk and other dependencies)
+venv_site_packages = amplifier_root / ".venv" / "lib"
+if venv_site_packages.exists():
+    # Find the python3.x directory
+    python_dirs = list(venv_site_packages.glob("python3.*"))
+    if python_dirs:
+        site_packages = python_dirs[0] / "site-packages"
+        if site_packages.exists():
+            sys.path.insert(0, str(site_packages))
+
 # Add amplifier to path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+sys.path.insert(0, str(amplifier_root))
+
+# Load environment variables from .env file
+from dotenv import load_dotenv  # noqa: E402
+
+load_dotenv()
 
 # Import logger from the same directory
 sys.path.insert(0, str(Path(__file__).parent))
-from hook_logger import HookLogger
+from hook_logger import HookLogger  # noqa: E402
 
 logger = HookLogger("post_tool_use")
 

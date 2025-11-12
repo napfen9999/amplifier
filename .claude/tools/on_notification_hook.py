@@ -10,7 +10,8 @@ import sys
 from pathlib import Path
 
 # Add parent directory to path to import amplifier module
-repo_root = Path(__file__).parent.parent.parent
+# IMPORTANT: Use .resolve() to handle symlinks correctly when amplifier is a submodule
+repo_root = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(repo_root))
 
 from amplifier.utils.notifications.core import NotificationSender  # noqa: E402

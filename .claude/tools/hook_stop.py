@@ -9,23 +9,40 @@ import json
 import sys
 from pathlib import Path
 
+# Get the amplifier root directory (3 levels up from this file)
+amplifier_root = Path(__file__).resolve().parent.parent.parent
+
+# Add amplifier venv to Python path FIRST (so we get claude-code-sdk and other dependencies)
+venv_site_packages = amplifier_root / ".venv" / "lib"
+if venv_site_packages.exists():
+    # Find the python3.x directory
+    python_dirs = list(venv_site_packages.glob("python3.*"))
+    if python_dirs:
+        site_packages = python_dirs[0] / "site-packages"
+        if site_packages.exists():
+            sys.path.insert(0, str(site_packages))
+
 # Add amplifier to path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+sys.path.insert(0, str(amplifier_root))
+
+# Load environment variables from .env file
+from dotenv import load_dotenv  # noqa: E402
+
+# Submodule-friendly .env loading:
+# 1. Load submodule .env first (defaults)
+# 2. Load parent project .env second (overrides)
+# This allows each parent project to control MEMORY_SYSTEM_ENABLED independently
+load_dotenv(dotenv_path=amplifier_root / ".env")  # Submodule defaults
+load_dotenv(dotenv_path=amplifier_root.parent / ".env", override=True)  # Parent project controls
 
 # Import logger from the same directory
 sys.path.insert(0, str(Path(__file__).parent))
-from hook_logger import HookLogger
+from hook_logger import HookLogger  # noqa: E402
 
 logger = HookLogger("stop_hook")
 
-try:
-    from amplifier.extraction import MemoryExtractor
-    from amplifier.memory import MemoryStore
-except ImportError as e:
-    logger.error(f"Failed to import amplifier modules: {e}")
-    # Exit gracefully to not break hook chain
-    json.dump({}, sys.stdout)
-    sys.exit(0)
+# Note: Imports moved to where they're used (inside main function)
+# to avoid loading modules when memory system is disabled
 
 
 async def main():
@@ -199,34 +216,37 @@ async def main():
                     logger.debug(f"Found context: {context[:50]}...")
                     break
 
-            # Initialize modules
-            logger.info("Initializing extractor and store")
-            extractor = MemoryExtractor()
-            store = MemoryStore()
+            # Import queue and router
+            from datetime import datetime
 
-            # Check data directory
-            logger.debug(f"Data directory: {store.data_dir}")
-            logger.debug(f"Data file: {store.data_file}")
-            logger.debug(f"Data file exists: {store.data_file.exists()}")
+            from amplifier.memory.queue import QueuedExtraction
+            from amplifier.memory.queue import queue_extraction
+            from amplifier.memory.router import route_hook_event
 
-            # Extract memories from messages
-            logger.info("Starting extraction from messages")
-            extracted = await extractor.extract_from_messages(messages, context)
-            logger.json_preview("Extraction result", extracted)
+            # Extract session ID from transcript path (or generate from path)
+            session_id = Path(transcript_path).stem if transcript_path else "unknown"
 
-            # Store extracted memories
+            # Route event to determine action
+            event_name = "Stop"  # This hook handles Stop events
+            action = route_hook_event(event_name, input_data)
+
             memories_count = 0
-            if extracted and "memories" in extracted:
-                memories_list = extracted.get("memories", [])
-                logger.info(f"Found {len(memories_list)} memories to store")
 
-                store.add_memories_batch(extracted)
-                memories_count = len(memories_list)
-
-                logger.info(f"Stored {memories_count} memories")
-                logger.info(f"Total memories in store: {len(store.get_all())}")
-            else:
-                logger.warning("No memories extracted")
+            if action.action == "skip":
+                logger.info(f"[STOP HOOK] Skipping: {action.reason}")
+            elif action.action == "queue":
+                # Queue for background processing
+                queue_extraction(
+                    QueuedExtraction(
+                        session_id=session_id,
+                        transcript_path=transcript_path,
+                        timestamp=datetime.now().isoformat(),
+                        hook_event="Stop",
+                    )
+                )
+                logger.info(f"[STOP HOOK] Queued session {session_id} for extraction")
+            elif action.action == "error":
+                logger.error(f"[STOP HOOK] Error: {action.reason}")
 
             # Build response
             output = {

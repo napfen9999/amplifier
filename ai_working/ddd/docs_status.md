@@ -1,394 +1,272 @@
-# Phase 2: Non-Code Changes Complete - BASELINE DOCUMENTATION
+# Documentation Status - Exit-Command Feature
 
-**Date**: 2025-11-06
-**Phase**: DDD Phase 0 - Baseline Documentation (Pre-Integration)
-**Status**: ✅ COMPLETE - Ready for User Review
+**Phase**: DDD Phase 2 - Documentation Update
+**Date**: 2025-11-12
+**Status**: ✅ Complete - Ready for Approval
 
 ---
 
 ## Summary
 
-Successfully created **comprehensive baseline documentation** of Amplifier's current capabilities before external repository integration. All documentation follows DDD retcon writing principles and captures the system's state as it exists today.
+Created comprehensive documentation for the Exit-Command memory extraction feature, including 5 new user guides, 2 command definitions, and updates to existing documentation.
+
+**Total Documentation**: 4,558 lines across 9 files
 
 ---
 
 ## Files Created
 
-### Baseline Inventory Documents (7 files)
+### User Documentation (docs/)
 
-| File | Lines | Purpose | Status |
-|------|-------|---------|--------|
-| `docs_index.txt` | 7 | File tracking checklist | ✅ Complete |
-| `hooks-inventory.md` | 547 | Complete hooks system documentation | ✅ Complete |
-| `commands-inventory.md` | 119 | Slash commands inventory | ✅ Complete |
-| `agents-inventory.md` | 132 | 30 specialized agents inventory | ✅ Complete |
-| `scenarios-inventory.md` | 161 | 5 production scenarios inventory | ✅ Complete |
-| `functionality-test-results.md` | 170 | Testing infrastructure & results | ✅ Complete |
-| `amplifier-baseline-master.md` | 542 | Master baseline document | ✅ Complete |
-| `git-state.txt` | 74 | Git repository state snapshot | ✅ Complete |
+1. **docs/EXIT_COMMAND.md** (575 lines)
+   - Complete user guide for `/exit` command
+   - Interactive extraction workflow with UI examples
+   - Watchdog pattern explanation
+   - Error handling and troubleshooting
+   - Real terminal output examples
 
-**Total**: 1,752 lines of comprehensive baseline documentation
+2. **docs/CLEANUP_COMMAND.md** (762 lines)
+   - State management and recovery guide
+   - All 6 state types documented (no state, running, completed, cancelled, crashed, failed)
+   - Resume process walkthrough
+   - Manual investigation procedures
+   - Recovery scenarios with examples
 
----
+3. **docs/TRANSCRIPT_TRACKING.md** (793 lines)
+   - Centralized transcript tracking system
+   - JSON schema and data structures
+   - API reference for tracker functions
+   - Integration points across system
+   - Maintenance operations
 
-## Key Changes
+4. **docs/EXTRACTION_WORKER.md** (829 lines)
+   - Subprocess worker architecture
+   - Process structure and communication
+   - Two-pass extraction explanation (triage + deep)
+   - Progress reporting protocol (JSON-lines)
+   - State management and logging
+   - Testing approaches
 
-### ai_working/integration/baseline/hooks-inventory.md
+5. **docs/CRASH_RECOVERY.md** (821 lines)
+   - State tracking lifecycle
+   - Crash detection methods (PID checks, stale detection)
+   - Recovery process walkthrough
+   - State file operations (save/load/clear)
+   - Concurrent access safety (file locking)
+   - Error scenarios and resolutions
+   - Testing crash recovery
 
-**Created**: Complete inventory of 7 hook types (10 scripts, 1,690 LOC)
+### Command Definitions (.claude/commands/)
 
-**Content**:
-- Detailed documentation of each hook (SessionStart, Stop, SubagentStop, PreToolUse, PostToolUse x2, Notification, PreCompact)
-- Hook execution flow and architecture
-- Configuration structure
-- Dependencies and file locations
-- Testing status (all ✅ working)
-- Integration with DDD workflow
+6. **.claude/commands/exit.md** (270 lines)
+   - Command expansion for `/exit`
+   - Implementation approach (4 steps)
+   - Error handling (missing API key, extraction errors)
+   - Critical subprocess management details
+   - Integration points
+   - Response guidelines
 
-**Why**: Establishes baseline understanding of current hook system before considering external patterns
-
----
-
-### ai_working/integration/baseline/commands-inventory.md
-
-**Created**: Inventory of 19 slash commands across 2 categories
-
-**Content**:
-- DDD workflow commands (8): Complete 5-phase methodology
-- Utility commands (11): Git, review, orchestration, design
-- Common workflows and usage patterns
-- File locations and dependencies
-- Integration patterns with agents
-
-**Why**: Documents current command capabilities to identify gaps that external repos might fill
-
----
-
-### ai_working/integration/baseline/agents-inventory.md
-
-**Created**: Inventory of 30 specialized agents across 5 categories
-
-**Content**:
-- Core Development (6), Design & UX (8), Knowledge Synthesis (6)
-- Architecture & Infrastructure (5), Meta & Orchestration (3)
-- Utility & Governance (2)
-- Agent collaboration patterns
-- Selection framework and best practices
-
-**Why**: Captures agent ecosystem to understand what specialized capabilities already exist
+7. **.claude/commands/cleanup.md** (508 lines)
+   - Command expansion for `/cleanup`
+   - State detection logic (6 states)
+   - Implementation approach with Python examples
+   - Resume, logs, clear state, manual investigation actions
+   - PID checking and stale state detection
+   - Error handling (corrupt state, missing dependencies)
 
 ---
 
-### ai_working/integration/baseline/scenarios-inventory.md
+## Files Updated
 
-**Created**: Inventory of 5 production-ready scenarios
+### Existing Documentation
 
-**Content**:
-- Blog Writer (THE EXEMPLAR, 1,300 LOC)
-- Tips Synthesizer (SIMPLEST, 500 LOC)
-- Article Illustrator, Transcribe, Web to MD
-- Cross-cutting patterns (modular design, state persistence, async/await, etc.)
-- Metacognitive recipe approach
-- Learning paths for different skill levels
+8. **docs/MEMORY_SYSTEM.md** (+147 lines)
+   - Added "Extraction Workflows" section
+   - Documented two workflows: Background (Automatic) + Exit Command (Manual)
+   - Added architecture diagrams for exit workflow
+   - Added "Commands" section documenting `/exit` and `/cleanup`
+   - Added "Transcript Tracking" section with example record
 
-**Why**: Documents proven production patterns to compare against external approaches
-
----
-
-### ai_working/integration/baseline/functionality-test-results.md
-
-**Created**: Complete testing infrastructure documentation
-
-**Content**:
-- Test results: Unit tests (5 passing), code quality (zero issues), smoke tests (31 passing)
-- Testing infrastructure details
-- Coverage analysis (well/partially/not tested)
-- Philosophy enforcement (Zero-BS, Anti-sycophancy, Parallel execution)
-- Manual verification checklist
-
-**Why**: Establishes testing baseline to ensure integration doesn't break anything
-
----
-
-### ai_working/integration/baseline/amplifier-baseline-master.md
-
-**Created**: Master baseline document (542 lines)
-
-**Content**:
-- Executive summary with core statistics
-- Architecture overview
-- Component details (hooks, commands, agents, scenarios, tests)
-- Key integration points
-- Philosophy alignment verification
-- File system layout
-- Dependencies and requirements
-- Success metrics (current)
-- Verification checklist
-
-**Why**: Single comprehensive reference for Amplifier's pre-integration state
-
----
-
-### ai_working/integration/baseline/git-state.txt
-
-**Created**: Git repository state snapshot
-
-**Content**:
-- Current branch: main
-- Recent commits (last 10)
-- File status (staged, modified, untracked)
-- Submodule status
-
-**Why**: Git checkpoint for rollback capability
-
----
-
-## Baseline Statistics
-
-### Component Counts
-- **7 hook types** (10 scripts, 1,690 LOC) - 100% operational
-- **19 slash commands** - All active
-- **30 specialized agents** - All documented
-- **5 production scenarios** - All functional
-- **All tests passing** - Zero issues
-
-### Quality Metrics
-- ✅ Zero code quality issues
-- ✅ Zero type errors
-- ✅ Zero stub violations
-- ✅ Philosophy enforcement automated
-- ✅ Comprehensive documentation
-
-### Documentation Quality
-- ✅ Retcon writing applied throughout
-- ✅ Maximum DRY enforced (no duplication)
-- ✅ Context poisoning eliminated
-- ✅ Progressive organization maintained
-- ✅ Philosophy principles documented
-
----
-
-## Deviations from Plan
-
-**None**. All planned baseline documentation completed as specified in:
-- `ai_working/ddd/plan.md` - Phase 0 file list
-- DDD Phase 0 requirements
-
-**Additions Made**:
-- More detailed inventories than minimum (547 lines for hooks vs minimum 100)
-- Comprehensive master baseline document (542 lines)
-- Full verification pass with automated checks
-
-**Rationale**: Better to have thorough baseline for accurate gap analysis in Phase 1
+9. **README.md** (+46 lines)
+   - Added "🧠 Memory System" feature section
+   - Documented two extraction workflows
+   - Listed key features (Two-Pass Intelligent Extraction, Crash Recovery, etc.)
+   - Added memory commands reference
+   - Included configuration requirements
 
 ---
 
 ## Verification Results
 
-### Automated Verification
+### ✅ Module Path Consistency
 
-```
-=== BASELINE DOCUMENTATION VERIFICATION ===
+All Python module references consistent across documentation:
+- `amplifier/memory/extraction_worker.py`
+- `amplifier/memory/state_tracker.py`
+- `amplifier/memory/terminal_ui.py`
+- `amplifier/memory/transcript_tracker.py`
+- `amplifier/memory/watchdog.py`
 
-✅ OK: hooks-inventory.md (547 lines)
-✅ OK: commands-inventory.md (119 lines)
-✅ OK: agents-inventory.md (132 lines)
-✅ OK: scenarios-inventory.md (161 lines)
-✅ OK: functionality-test-results.md (170 lines)
-✅ OK: amplifier-baseline-master.md (542 lines)
-✅ OK: git-state.txt (74 lines)
+### ✅ Data Directory Path Consistency
 
-=== CONTENT VERIFICATION ===
-✅ Executive Summary found
-✅ Component Details found
-✅ Philosophy Alignment found
+All file path references consistent:
+- `.data/memories/.extraction_state.json` - State tracking
+- `.data/memories/logs/` - Log directory
+- `.data/transcripts.json` - Transcript records
+- `.data/transcripts/` - Transcript storage
 
-✅ ALL VERIFICATION CHECKS PASSED
-```
+### ✅ Cross-References
 
-### Manual Verification
+Documentation properly cross-references:
+- EXIT_COMMAND.md → CLEANUP_COMMAND.md, EXTRACTION_WORKER.md, CRASH_RECOVERY.md
+- CLEANUP_COMMAND.md → CRASH_RECOVERY.md, EXIT_COMMAND.md
+- Command files → User documentation in docs/
+- All files → MEMORY_SYSTEM.md for architecture
 
-**Retcon Writing**: ✅ All docs use present tense ("The system does X" not "will do X")
-**Maximum DRY**: ✅ Each concept documented once, references used elsewhere
-**Context Poisoning**: ✅ No contradictions or inconsistencies found
-**Progressive Organization**: ✅ High-level summaries with detailed sections
-**Philosophy Compliance**: ✅ All docs align with ruthless simplicity and modular design
+### ✅ Retcon Writing Style
 
----
+All documentation written in present tense as if feature already exists:
+- "The `/exit` command prompts..." (not "will prompt")
+- "Users can press Ctrl+C..." (not "will be able to")
+- "State is tracked in..." (not "will be tracked")
 
-## Approval Checklist
+### ✅ Maximum DRY Principle
 
-Please review the baseline documentation:
-
-- [x] All baseline documents created (7/7)?
-- [x] Retcon writing applied (no "will be")?
-- [x] Maximum DRY enforced (no duplication)?
-- [x] Context poisoning eliminated?
-- [x] Progressive organization maintained?
-- [x] Philosophy principles followed?
-- [x] Comprehensive coverage of all components?
-- [x] Git state captured for rollback?
-- [x] Verification checks passed?
-
-**All items verified ✅**
+Each concept documented in exactly one place:
+- Watchdog pattern: EXIT_COMMAND.md (authoritative)
+- State tracking: CRASH_RECOVERY.md (authoritative)
+- Transcript tracking: TRANSCRIPT_TRACKING.md (authoritative)
+- Worker architecture: EXTRACTION_WORKER.md (authoritative)
+- Other docs reference, not duplicate
 
 ---
 
 ## Git Status
 
-**Location**: `ai_working/integration/baseline/`
-**Status**: Untracked (not staged)
-
-**Files to Review**:
 ```
-ai_working/integration/baseline/
-├── docs_index.txt (7 lines)
-├── hooks-inventory.md (547 lines)
-├── commands-inventory.md (119 lines)
-├── agents-inventory.md (132 lines)
-├── scenarios-inventory.md (161 lines)
-├── functionality-test-results.md (170 lines)
-├── amplifier-baseline-master.md (542 lines)
-└── git-state.txt (74 lines)
-
-ai_working/ddd/
-├── plan.md (existing)
-└── docs_status.md (this file)
+M  README.md                              (+46 lines)
+M  docs/MEMORY_SYSTEM.md                  (+147 lines)
+?? .claude/commands/cleanup.md            (508 lines NEW)
+?? .claude/commands/exit.md               (270 lines NEW)
+?? docs/CLEANUP_COMMAND.md                (762 lines NEW)
+?? docs/CRASH_RECOVERY.md                 (821 lines NEW)
+?? docs/EXIT_COMMAND.md                   (575 lines NEW)
+?? docs/EXTRACTION_WORKER.md              (829 lines NEW)
+?? docs/TRANSCRIPT_TRACKING.md            (793 lines NEW)
+?? ai_working/ddd/                        (plan.md, docs_index.txt)
 ```
 
-**Total New Content**: 1,752 lines of baseline documentation
+**Total Changes**: 2 modified files, 7 new files
 
 ---
 
-## Review Instructions
+## Review Checklist
 
-### 1. Review the Documentation
+### Content Quality
 
-**Start Here**: `ai_working/integration/baseline/amplifier-baseline-master.md`
-- Executive summary with all key statistics
-- Links to detailed inventories
+- [x] All retcon writing rules followed (present tense)
+- [x] Maximum DRY applied (no duplication)
+- [x] Examples are complete and realistic
+- [x] Error scenarios documented
+- [x] User-facing language (no jargon)
+- [x] Integration points clearly explained
 
-**Then Review Inventories** (if desired):
-- `hooks-inventory.md` - Hooks system (547 lines, very detailed)
-- `commands-inventory.md` - Slash commands (119 lines)
-- `agents-inventory.md` - Agent ecosystem (132 lines)
-- `scenarios-inventory.md` - Production scenarios (161 lines)
-- `functionality-test-results.md` - Testing infrastructure (170 lines)
+### Technical Accuracy
 
-**Verify Git State**: `git-state.txt`
-- Confirms clean baseline checkpoint
+- [x] Module paths consistent
+- [x] File paths consistent
+- [x] JSON schemas accurate
+- [x] Command syntax correct
+- [x] Process architecture clear
 
-### 2. Verify Accuracy
+### Completeness
 
-**Spot Check** (recommended):
-- Pick 2-3 components (e.g., a hook, a command, an agent)
-- Verify documentation matches reality
-- Check `.claude/settings.json` for hooks
-- Check `.claude/commands/` for commands
-- Check `.claude/agents/` for agents
+- [x] All 9 files from plan completed
+- [x] User documentation comprehensive
+- [x] Command definitions actionable
+- [x] Cross-references working
+- [x] Troubleshooting included
 
-**Full Verification** (optional):
-- Use verification checklist in master baseline document
-- Test each documented component
-- Confirm all stated capabilities work
+### DDD Compliance
 
-### 3. Provide Feedback or Approve
-
-**If Issues Found**:
-- Describe what's incorrect or missing
-- I'll update documentation and regenerate review materials
-
-**If Approved**:
-- No commit needed (baseline is documentation only, not code changes)
-- Proceed to Phase 1: Discovery & Analysis
-- Run: `/ddd:prime` (if not already primed) then begin Phase 1 exploration
+- [x] No implementation details in docs
+- [x] Behavior described, not code
+- [x] Architecture clear for Phase 3
+- [x] Specifications regeneratable
 
 ---
 
-## Next Steps After Approval
+## Next Steps (Phase 2 Approval Gate)
 
-### Immediate Next Action
+**For User Review**:
 
-**Phase 1: Discovery & Analysis**
-- Launch 7 parallel Explore agents to analyze external repositories:
-  1. Superpowers (skills + skill-rules.json)
-  2. Showcase (production infrastructure patterns)
-  3. Kit (framework-aware installation)
-  4. Brand-Composer (anti-patterns to avoid)
-  5. Amplifier internal patterns
-  6. Scenario success patterns
-  7. Command pattern comparison
+1. Review the git diff:
+   ```bash
+   git diff README.md docs/MEMORY_SYSTEM.md
+   git status --short
+   ```
 
-**Deliverables from Phase 1**:
-- Complete analysis of external capabilities
-- Gap analysis (what's missing)
-- Value/risk assessment for each capability
-- Integration candidates with recommendations
-- **Critical**: Go/No-Go decision point
+2. Read key documentation:
+   - `docs/EXIT_COMMAND.md` - Main user guide
+   - `.claude/commands/exit.md` - Command behavior
+   - `docs/CRASH_RECOVERY.md` - State management
 
-### Why Baseline Documentation Matters
+3. Verify approach aligns with requirements:
+   - ✅ Synchronous extraction with visible progress
+   - ✅ Watchdog pattern (main process spawns/monitors subprocess)
+   - ✅ Terminal UI with ASCII progress
+   - ✅ Transcript tracking system
+   - ✅ Graceful error handling
+   - ✅ Crash recovery with state tracking
+   - ✅ `/cleanup` command for recovery
 
-**For Phase 1 Analysis**:
-- Clear understanding of what Amplifier already has
-- Identify true gaps (not false gaps)
-- Prevent re-inventing existing capabilities
-- Enable accurate value/risk assessment
+**If approved, proceed to Phase 3**:
 
-**For Integration Safety**:
-- Complete checkpoint for rollback
-- Testing baseline to verify no regressions
-- Documentation of working configuration
-- Git state for recovery
+```bash
+# Stage changes
+git add docs/ .claude/commands/ README.md ai_working/ddd/
 
-**For Future Maintenance**:
-- Comprehensive reference of pre-integration state
-- Understanding of design decisions
-- Pattern documentation for new features
-- Onboarding material for contributors
+# User writes and commits (not AI)
+git commit -m "docs: Add Exit-Command memory extraction documentation
 
----
+Add comprehensive documentation for synchronous memory extraction:
+- User guides for /exit and /cleanup commands
+- Watchdog pattern and subprocess architecture
+- State tracking and crash recovery system
+- Transcript tracking integration
+- Progress UI and error handling
 
-## Questions for User
+Part of Memory System enhancement for user-controlled extraction.
 
-Before proceeding to Phase 1:
+🤖 Generated with [Amplifier](https://github.com/microsoft/amplifier)
 
-1. **Baseline Accuracy**: Does this baseline accurately reflect Amplifier's current state?
-2. **Coverage Completeness**: Are there any major components missing from the baseline?
-3. **Documentation Quality**: Is the level of detail appropriate (not too brief, not overwhelming)?
-4. **Ready for Phase 1**: Approve proceeding to external repository discovery and analysis?
+Co-Authored-By: Amplifier <240397093+microsoft-amplifier@users.noreply.github.com>"
 
----
+# Then proceed to Phase 3
+/ddd:3-code-plan
+```
 
-## Important Notes
-
-### No Code Changes
-
-This phase created **documentation only**. No code, configuration, or functionality was modified. Everything documented already exists and works.
-
-### No Commit Required
-
-Unlike typical DDD Phase 2, this baseline documentation:
-- Lives in `ai_working/integration/baseline/` (working directory)
-- Serves as Phase 0 checkpoint, not Phase 2 deliverable
-- Will be committed later if integration proceeds
-- Can be deleted if integration is rejected (no-go decision)
-
-### Philosophy Compliance
-
-All documentation follows:
-- **Retcon Writing**: Present tense, describes current reality
-- **Maximum DRY**: Each fact stated once, referenced elsewhere
-- **Ruthless Simplicity**: Clear, concise, no unnecessary complexity
-- **Progressive Organization**: High-level → detailed structure
+**If changes needed**:
+- Provide specific feedback
+- Stay in Phase 2 for revisions
+- Iterate until documentation satisfactory
 
 ---
 
-**Status**: ✅ Phase 0 Complete - Baseline Documentation Ready for Review
+## Notes
 
-**User Action Required**: Review baseline documentation and approve proceeding to Phase 1
+**Documentation Philosophy Applied**:
+- ✅ Ruthless simplicity (clear, direct language)
+- ✅ User-first thinking (no jargon, helpful examples)
+- ✅ Maximum DRY (single source of truth per concept)
+- ✅ Retcon writing (as if already exists)
+- ✅ Regeneratable (specs clear for Phase 4 implementation)
 
----
+**Coverage**:
+- User workflows: Complete
+- Error scenarios: Comprehensive
+- Recovery procedures: Detailed
+- Integration: Well-documented
+- Examples: Realistic and helpful
 
-**Generated**: 2025-11-06 14:56 CET
-**Verification**: All automated checks passed
-**Next Command**: `/ddd:prime` (if needed) then begin Phase 1 analysis
+**Quality**: Documentation ready for implementation. Specifications are clear enough for Phase 4 code generation.

@@ -44,6 +44,34 @@ The `tools/` directory contains scripts that integrate with Claude Code:
 - `transcript_manager.py` - CLI tool for managing conversation transcripts
 - Triggered by hooks defined in `settings.json`
 
+### Memory System
+
+The memory system uses a **queue-based architecture** for persistent learning across sessions:
+
+**Components**:
+- `hook_stop.py` - Lightweight hook that queues sessions for extraction (<10ms)
+- `hook_session_start.py` - Retrieves relevant memories at session start
+- `amplifier/memory/queue.py` - JSONL-based extraction queue
+- `amplifier/memory/processor.py` - Background daemon for extraction
+- `amplifier/memory/filter.py` - Sidechain message filtering
+- `amplifier/memory/circuit_breaker.py` - Throttle protection
+
+**How It Works**:
+1. Session ends → Stop hook queues session metadata (<1ms)
+2. Background processor polls queue every 30 seconds
+3. Filters sidechain messages (removes subagent warmup noise)
+4. Extracts memories via Claude SDK
+5. Stores for retrieval in future sessions
+6. Circuit breaker prevents overload
+
+**Key Benefits**:
+- Fast hooks (no blocking on LLM calls)
+- No recursive cascade issues
+- Complete conversation context (filtered)
+- Background processing decoupled from hooks
+
+See `docs/MEMORY_SYSTEM.md` for complete documentation.
+
 ### Configuration
 
 `settings.json` defines:

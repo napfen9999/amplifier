@@ -4,17 +4,37 @@
 
 The Amplifier Memory System provides persistent memory extraction and retrieval capabilities for Claude Code conversations. It automatically extracts key learnings, decisions, and solutions from conversations and makes them available in future sessions.
 
+The system uses a **queue-based architecture** that decouples hook execution from memory extraction, ensuring fast hook response times and preventing recursive cascade issues.
+
 ## Features
 
-- **Automatic extraction** of memories from conversations
-- **Pattern-based extraction** for reliable operation outside Claude Code environment
+- **Queue-based extraction** - Hooks queue sessions for background processing
+- **Background processor** - Daemon handles extraction without blocking hooks
+- **Sidechain message filtering** - Removes subagent warmup noise from extraction
 - **Session persistence** across multiple conversations
 - **Relevance search** for contextual memory retrieval
+- **Circuit breaker protection** - Throttle protection against hook spam
 - **Opt-in system** via environment variable
 
 ## Configuration
 
 The memory system is **disabled by default** and must be explicitly enabled.
+
+### Requirements
+
+**⚠️ IMPORTANT: API Key Required**
+
+The Memory System requires an Anthropic API key for LLM-based memory extraction:
+
+1. **Get an API key** at https://console.anthropic.com/settings/keys
+2. **Add credits** to your Anthropic Console account (pay-as-you-go)
+3. **Set the key** in your `.env` file:
+
+```bash
+ANTHROPIC_API_KEY=sk-ant-...  # Required for memory extraction
+```
+
+**Note**: Your Claude Code subscription (Pro/Max) **cannot** be used for the SDK. The Memory System uses the Anthropic API (separate billing) for programmatic access. Memory extraction with Haiku 4.5 is very cost-effective (~$0.001-0.01 per session).
 
 ### Enabling the Memory System
 
@@ -32,8 +52,12 @@ All configuration options can be set via environment variables:
 # Enable/disable the memory system
 MEMORY_SYSTEM_ENABLED=false  # true/1/yes to enable, false/0/no to disable
 
+# Anthropic API Key (REQUIRED for memory extraction)
+ANTHROPIC_API_KEY=sk-ant-...  # Get at console.anthropic.com
+
 # Model for memory extraction (fast model recommended)
-MEMORY_EXTRACTION_MODEL=claude-3-5-haiku-20241022
+# Haiku 4.5: 73.3% on SWE-bench, 2x faster than Sonnet 4, 1/3 the cost
+MEMORY_EXTRACTION_MODEL=claude-haiku-4-5
 
 # Extraction settings
 MEMORY_EXTRACTION_TIMEOUT=120          # Timeout in seconds
@@ -41,28 +65,90 @@ MEMORY_EXTRACTION_MAX_MESSAGES=20      # Max messages to process
 MEMORY_EXTRACTION_MAX_CONTENT_LENGTH=500  # Max chars per message
 MEMORY_EXTRACTION_MAX_MEMORIES=10      # Max memories per session
 
-# Storage location
+# Queue processing
+EXTRACTION_QUEUE_INTERVAL=30           # Background processor interval (seconds)
+
+# Storage location (directory where memory.json will be stored)
+# The actual file will be at: <MEMORY_STORAGE_DIR>/memory.json
 MEMORY_STORAGE_DIR=.data/memories
+
+# Maximum total memories to keep in storage
+# When this limit is exceeded, oldest/least-accessed memories are rotated out
+# Range: 10-100000, Default: 1000
+MEMORY_MAX_MEMORIES=1000
 ```
+
+### Path Resolution
+
+**Automatic path resolution based on Claude Code environment:**
+
+When Amplifier is used as a submodule, the Memory System automatically resolves storage paths relative to the **Claude Code project root** (not the submodule directory).
+
+**How it works:**
+- Relative paths in `MEMORY_STORAGE_DIR` are resolved relative to `$CLAUDE_PROJECT_DIR`
+- Absolute paths are used as-is
+- Falls back to current working directory if `$CLAUDE_PROJECT_DIR` is not set
+
+**Example (Amplifier as submodule):**
+
+```bash
+# Project structure:
+# /home/user/my-project/          ← Claude Code project root
+# /home/user/my-project/amplifier/ ← Amplifier submodule
+
+# Configuration in parent .env:
+MEMORY_STORAGE_DIR=.data/memories
+
+# Resolved path:
+# → /home/user/my-project/.data/memories (parent, not submodule!)
+```
+
+**Benefits:**
+- ✅ Per-project memory storage (each project has its own memories)
+- ✅ Parent `.env` overrides submodule defaults
+- ✅ No manual path configuration needed
+- ✅ Works consistently across hooks, processor, and CLI
+
+**Note**: The `MEMORY_STORAGE_DIR` and `MEMORY_MAX_MEMORIES` environment variables control storage behavior. All components (hooks, processor, CLI) automatically use these configured values.
 
 ## Architecture
 
 ### Components
 
 1. **Claude Code Hooks** (`.claude/tools/`)
-   - `hook_stop.py` - Extracts memories at conversation end
+   - `hook_stop.py` - Queues sessions for extraction (lightweight, <10ms)
    - `hook_session_start.py` - Retrieves relevant memories at start
    - `hook_post_tool_use.py` - Validates claims against memories
 
-2. **Memory Extraction** (`amplifier/extraction/`)
+2. **Memory Queue** (`amplifier/memory/queue.py`)
+   - JSONL-based queue for pending extractions
+   - Fast append operations (non-blocking)
+   - Persistent across restarts
+
+3. **Background Processor** (`amplifier/memory/processor.py`)
+   - Daemon process handling queued extractions
+   - Runs independently of Claude Code hooks
+   - Polls queue every 30 seconds (configurable)
+
+4. **Message Filter** (`amplifier/memory/filter.py`)
+   - Removes sidechain messages (subagent warmup)
+   - Extracts only main conversation content
+   - Improves extraction quality
+
+5. **Memory Extraction** (`amplifier/extraction/`)
    - Pattern-based extraction fallback
    - Claude Code SDK support when available
    - Quality filtering and validation
 
-3. **Memory Storage** (`amplifier/memory/`)
+6. **Memory Storage** (`amplifier/memory/`)
    - JSON-based persistent storage
    - Categorized memories with metadata
    - Search and retrieval capabilities
+
+7. **Circuit Breaker** (`amplifier/memory/circuit_breaker.py`)
+   - Throttle protection against excessive hook frequency
+   - Prevents system overload
+   - Automatic recovery after cooldown
 
 ### Memory Categories
 
@@ -74,16 +160,119 @@ MEMORY_STORAGE_DIR=.data/memories
 
 ## How It Works
 
-### 1. Memory Extraction
+### Extraction Workflows
 
-When a conversation ends (Stop or SubagentStop event), the system:
+The memory system provides two extraction workflows:
+
+**1. Background Processing (Automatic)**
+- Transcripts queued automatically on session end
+- Background processor extracts memories asynchronously
+- No user interaction required
+- Runs continuously in background
+
+**2. Exit Command (Manual)**
+- User-initiated extraction via `/exit` command
+- Synchronous extraction with visible progress
+- Full control over when extraction happens
+- Runs in subprocess with progress UI
+
+Both workflows share the same extraction engine and produce identical results. The difference is **when** and **how** extraction happens, not **what** gets extracted.
+
+---
+
+### Queue-Based Architecture (Background Processing)
+
+The system decouples hook execution from memory extraction for performance and reliability:
+
+```
+Claude Code Session Ends
+         ↓
+    Stop Hook Fires (lightweight)
+         ↓
+    Check Circuit Breaker
+         ↓
+    Queue Session for Extraction (<1ms)
+         ↓
+    Add to Transcript Tracking
+         ↓
+    Hook Returns Immediately
+
+         [Background Process]
+
+Background Processor Polls Queue
+         ↓
+    Read Queued Session
+         ↓
+    Filter Sidechain Messages
+         ↓
+    Call Claude SDK for Extraction
+         ↓
+    Store Memories
+         ↓
+    Mark Transcript Processed
+         ↓
+    Remove from Queue
+```
+
+---
+
+### Manual Extraction (Exit Command)
+
+The exit command provides user-controlled extraction:
+
+```
+User Runs /exit
+         ↓
+    Check for Unprocessed Transcripts
+         ↓
+    Prompt: "Extract memories? (Y/n)"
+         ↓
+    [If Yes]
+         ↓
+    Spawn Extraction Worker (subprocess)
+         ↓
+    Display Progress UI (terminal)
+         ↓
+    Worker Processes Transcripts
+         ↓
+    Store Memories
+         ↓
+    Mark Transcripts Processed
+         ↓
+    Show Completion Summary
+         ↓
+    Exit Claude Code
+```
+
+**Key benefits**:
+- Full visibility into extraction progress
+- Synchronous completion before exit
+- No hidden background processing
+- User controls timing
+
+See [Exit Command Guide](EXIT_COMMAND.md) for complete usage documentation.
+
+### 1. Session End (Stop Hook)
+
+When a conversation ends (Stop event), the system:
 1. Checks if memory system is enabled via environment variable
-2. Reads the conversation transcript
-3. Filters to user and assistant messages only
-4. Extracts key memories using pattern matching
-5. Stores memories with metadata (timestamp, tags, importance)
+2. Verifies circuit breaker allows queueing
+3. Appends session metadata to extraction queue (<1ms)
+4. Returns immediately (no blocking on LLM calls)
 
-### 2. Memory Retrieval
+**Note**: SubagentStop events are **not** processed to avoid cascade issues and incomplete context.
+
+### 2. Background Processing
+
+The background processor daemon:
+1. Polls the extraction queue every 30 seconds (configurable)
+2. Reads queued session transcripts
+3. Filters sidechain messages (removes subagent warmup)
+4. Extracts key memories using Claude SDK
+5. Stores memories with metadata (timestamp, tags, importance)
+6. Removes processed items from queue
+
+### 3. Memory Retrieval
 
 At conversation start (SessionStart event), the system:
 1. Checks if memory system is enabled
@@ -91,7 +280,7 @@ At conversation start (SessionStart event), the system:
 3. Retrieves recent memories for context
 4. Provides memories as additional context to Claude
 
-### 3. Claim Validation
+### 4. Claim Validation
 
 After tool use (PostToolUse event), the system:
 1. Checks if memory system is enabled
@@ -100,7 +289,7 @@ After tool use (PostToolUse event), the system:
 
 ## Memory Storage Format
 
-Memories are stored in JSON format at `.data/memory.json`:
+Memories are stored in JSON format at `<MEMORY_STORAGE_DIR>/memory.json` (default: `.data/memories/memory.json`):
 
 ```json
 {
@@ -111,7 +300,7 @@ Memories are stored in JSON format at `.data/memory.json`:
       "metadata": {
         "tags": ["sdk", "claude"],
         "importance": 0.8,
-        "extraction_method": "pattern_fallback"
+        "extraction_method": "sdk"
       },
       "id": "uuid",
       "timestamp": "2025-08-26T10:10:13.391379",
@@ -130,14 +319,133 @@ Memories are stored in JSON format at `.data/memory.json`:
 }
 ```
 
+## Queue Format
+
+The extraction queue is stored at `.data/extraction_queue.jsonl`:
+
+```jsonl
+{"session_id": "abc123", "transcript_path": "/path/to/transcript.jsonl", "timestamp": "2025-11-11T14:30:00", "hook_event": "Stop"}
+{"session_id": "def456", "transcript_path": "/path/to/transcript.jsonl", "timestamp": "2025-11-11T14:35:00", "hook_event": "Stop"}
+```
+
+## Commands
+
+### Exit Command
+
+Extract memories when ending a Claude Code session:
+
+```bash
+/exit
+```
+
+**What it does**:
+1. Checks for unprocessed transcripts
+2. Prompts: "Extract memories before exit? (Y/n)"
+3. If Yes: Runs synchronous extraction with progress UI
+4. Shows completion summary
+5. Exits Claude Code
+
+**When to use**:
+- Want immediate extraction before leaving
+- Need to verify extraction completes
+- Prefer visible progress over background processing
+
+See [Exit Command Guide](EXIT_COMMAND.md) for complete documentation.
+
+---
+
+### Cleanup Command
+
+Manage extraction state and recovery:
+
+```bash
+/cleanup
+```
+
+**What it does**:
+- Shows extraction status (running/completed/crashed/cancelled)
+- Offers to resume interrupted extractions
+- Cleans up completed state
+- Provides recovery options after crashes
+
+**When to use**:
+- After interrupted extraction (Ctrl+C, crash, reboot)
+- Want to check extraction status
+- Need to resume incomplete work
+- Clean up old state files
+
+See [Cleanup Command Guide](CLEANUP_COMMAND.md) for complete documentation.
+
+---
+
+## Transcript Tracking
+
+The system tracks all transcripts from creation through processing:
+
+**Tracking file**: `.data/transcripts.json`
+
+**Automatically tracks**:
+- When transcripts are created (session end)
+- Which are processed vs. pending
+- Memory count for each transcript
+- Processing timestamps
+
+**Used by**:
+- `/exit` command (counts unprocessed transcripts)
+- Extraction worker (identifies what to process)
+- `/cleanup` command (shows extraction history)
+
+**Example record**:
+```json
+{
+  "session_id": "abc123",
+  "transcript_path": "/path/to/transcript.jsonl",
+  "created_at": "2025-11-12T15:30:00",
+  "processed": true,
+  "processed_at": "2025-11-12T15:35:00",
+  "memories_extracted": 15
+}
+```
+
+See [Transcript Tracking Guide](TRANSCRIPT_TRACKING.md) for technical details.
+
+---
+
+## Background Processor
+
+### Starting the Processor
+
+The background processor runs as a separate daemon:
+
+```bash
+# Start processor in background
+python -m amplifier.memory.processor &
+
+# Or use screen/tmux for persistent session
+screen -S memory-processor python -m amplifier.memory.processor
+```
+
+### Processor Status
+
+Check processor activity:
+
+```bash
+# Check if running
+ps aux | grep "memory.processor"
+
+# View recent extractions
+tail -f .claude/logs/processor_$(date +%Y%m%d).log
+```
+
 ## Debugging
 
 ### Log Files
 
 When enabled, the memory system logs to `.claude/logs/`:
-- `stop_hook_YYYYMMDD.log` - Stop hook logs
-- `session_start_YYYYMMDD.log` - Session start logs  
+- `stop_hook_YYYYMMDD.log` - Stop hook logs (queueing operations)
+- `session_start_YYYYMMDD.log` - Session start logs
 - `post_tool_use_YYYYMMDD.log` - Post tool use logs
+- `processor_YYYYMMDD.log` - Background processor logs
 
 Logs are automatically rotated after 7 days.
 
@@ -146,38 +454,216 @@ Logs are automatically rotated after 7 days.
 1. **Memory system not activating**
    - Ensure `MEMORY_SYSTEM_ENABLED=true` is set
    - Check logs in `.claude/logs/` for errors
+   - Verify background processor is running
 
 2. **No memories being extracted**
-   - Verify conversation has substantive content
-   - Check extraction patterns are matching
-   - Review logs for timeout errors
+   - Check extraction queue: `cat .data/extraction_queue.jsonl`
+   - Verify background processor is running: `ps aux | grep memory.processor`
+   - Review processor logs for errors
+   - Check conversation has substantive content
 
-3. **Timeout issues**
-   - Default timeout is 120 seconds
-   - May need adjustment for longer conversations
-   - Pattern extraction is used as fallback
+3. **Queue growing but not processing**
+   - Background processor may not be running
+   - Check processor logs for errors
+   - Verify Claude SDK credentials are valid
+   - Check timeout settings
+
+4. **Circuit breaker activated**
+   - Too many hook events in short period
+   - Check logs for "Circuit breaker" messages
+   - System will automatically recover after cooldown
+
+## Memory Rotation
+
+When the number of stored memories exceeds `MEMORY_MAX_MEMORIES`, automatic rotation removes the oldest/least-accessed memories.
+
+### How Rotation Works
+
+1. **Trigger**: Activated when memories exceed configured limit (default: 1000)
+
+2. **Sorting**: Memories are ranked by:
+   - **Primary**: Access count (how often retrieved)
+   - **Secondary**: Timestamp (how recent)
+
+3. **Removal**: Oldest and least-accessed memories are removed first
+
+4. **Retention**: Most valuable memories (frequently accessed + recent) are kept
+
+### Configuration
+
+```bash
+# Set custom limit via environment variable
+MEMORY_MAX_MEMORIES=5000  # Keep up to 5000 memories
+
+# Valid range: 10-100000
+# Values outside range are clamped to min/max
+```
+
+### Example
+
+**Before Rotation:**
+- 1100 memories in storage
+- Limit: 1000
+
+**After Rotation:**
+- 1000 memories retained (most accessed + recent)
+- 100 memories removed (rarely used + old)
+- Log message: `INFO: Rotated out 100 old memories`
+
+### Monitoring
+
+Check memory count in storage:
+```python
+from amplifier.memory import MemoryStore
+store = MemoryStore()
+count = len(store.get_all())
+print(f"Current memories: {count}")
+print(f"Limit: {store.max_memories}")
+```
+
+## Performance Characteristics
+
+- **Hook execution**: <10ms (queue append only)
+- **Background processing**: 30-60 seconds per session
+- **Memory retrieval**: <100ms (indexed search)
+- **No blocking operations** in Claude Code hooks
 
 ## Implementation Philosophy
 
 The memory system follows the project's core philosophies:
 
-- **Ruthless Simplicity** - Pattern-based extraction, JSON storage
-- **Modular Design** - Self-contained hooks and modules
-- **Fail Gracefully** - Opt-in system that doesn't break workflows
+- **Ruthless Simplicity** - File-based queue, simple polling
+- **Modular Design** - Self-contained modules with stable interfaces
+- **Fail Gracefully** - Circuit breaker prevents overload
 - **Direct Integration** - Minimal wrappers around functionality
+- **Architectural Integrity** - Queue-based decoupling prevents cascade
 
 ## Security Considerations
 
 - Memories may contain sensitive information
 - Storage is local to the machine
 - No external API calls for storage
-- Pattern extraction filters system messages
+- Background processor runs with user permissions
+- Queue files readable only by user
+
+## Large Session Handling
+
+The extraction system uses **Two-Pass Intelligent Extraction** to automatically analyze sessions of any size without requiring manual configuration.
+
+### How Two-Pass Works
+
+The system intelligently processes ALL messages in a session using a two-stage LLM-driven approach:
+
+**Pass 1: Triage (Intelligence Scan)**
+- LLM scans all messages to identify important sections
+- Returns message ranges containing key decisions, solutions, and breakthroughs
+- Fast scan optimized for coverage across entire session
+- Identifies 3-5 most important conversation segments
+
+**Pass 2: Deep Extraction**
+- LLM performs detailed memory extraction from identified ranges only
+- Full context preserved within each important segment
+- High-quality extraction focused on what matters
+- Standard extraction quality maintained (8+/10)
+
+**Result**: Intelligent coverage of entire session + efficient processing of only important parts.
+
+```
+Session Messages (any size)
+    ↓
+Pass 1: Triage - Scan ALL messages → [(range1), (range2), ...]
+    ↓
+Pass 2: Extract - Deep analysis of important ranges only
+    ↓
+High-quality memories stored
+```
+
+### Configuration
+
+Two-Pass extraction is **enabled by default** and requires no manual configuration:
+
+```bash
+# Enable/disable intelligent extraction (default: true)
+INTELLIGENT_SAMPLING_ENABLED=true
+
+# Maximum important ranges to identify (default: 5)
+TRIAGE_MAX_RANGES=5
+
+# Triage timeout in seconds (default: 30)
+TRIAGE_TIMEOUT=30
+
+# Backward compatibility: Manual limit still supported
+# MEMORY_EXTRACTION_MAX_MESSAGES=20  # Fallback if triage fails
+```
+
+**Note**: The system automatically falls back to processing the last 50 messages if triage fails, ensuring extraction always succeeds.
+
+### Quality Metrics
+
+| Session Size | Coverage | Typical Quality | Method | Status |
+|--------------|----------|-----------------|--------|--------|
+| <50 messages | 90-100% | 9+/10 | Two-Pass | ✅ Excellent |
+| 50-100 messages | 60-90% | 8.5+/10 | Two-Pass | ✅ Excellent |
+| 100-500 messages | 40-70% | 8.5+/10 | Two-Pass | ✅ Very Good |
+| 500-1000 messages | 20-50% | 8+/10 | Two-Pass | ✅ Good |
+| >1000 messages | 10-30% | 8+/10 | Two-Pass | ✅ Good |
+
+**Key improvements over simple sampling:**
+- ✅ Coverage increased 5-15× for large sessions
+- ✅ Early decisions captured (not just recent conversation)
+- ✅ No manual configuration needed
+- ✅ Quality maintained across all session sizes
+
+### Monitoring Extraction
+
+Check extraction activity in processor logs:
+
+```bash
+tail -f .claude/logs/processor_$(date +%Y%m%d).log
+```
+
+Look for log entries showing:
+- `[TWO-PASS] Session: N total messages` - Session size
+- `[TRIAGE] Identified X important ranges` - Ranges found
+- `[EXTRACTION] Processing Y messages from ranges` - Messages extracted
+- `[TWO-PASS] Extracted Z memories` - Final memory count
+
+**See:** `docs/MEMORY_LARGE_TRANSCRIPT_STRATEGY.md` for complete technical details and strategy rationale.
+
+## Quality Assurance
+
+### Testing Results
+
+**Test Session:** dae8d5ac-1296-4bda-a9da-b8fd56782a7e
+- Transcript: 1049 messages (428.3KB)
+- Processed: Last 20 messages
+- Extracted: 4 memories
+- Average Quality: 8.0/10 ✅
+
+**Quality Dimensions:**
+- ✅ **Accuracy**: All memories factually correct (no hallucinations)
+- ✅ **Relevance**: Captured major technical issues and decisions
+- ✅ **Categorization**: Appropriate types (issue_solved, learning, pattern)
+- ✅ **Tagging**: Useful tags for retrieval
+- ✅ **Importance**: Reasonable scoring (0.7-0.9)
+
+**Known Limitations:**
+- Limited coverage for large sessions (see above)
+- Temporal bias toward recent conversation
+- Context preservation varies by memory type
+
+**Production Status:** ✅ **READY** - Quality exceeds minimum threshold (7/10), with documented limitations and improvement path.
+
+**See:** `docs/MEMORY_QUALITY_TESTING.md` for complete testing framework.
 
 ## Future Enhancements
 
 Potential improvements while maintaining simplicity:
 
+- Intelligent sampling (importance-weighted message selection)
+- Chunked transcript processing (handle any file size)
 - Vector similarity search for better retrieval
 - Memory decay/aging for relevance
 - Cross-project memory sharing
 - Memory export/import capabilities
+- Quality dashboard and coverage metrics

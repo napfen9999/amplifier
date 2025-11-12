@@ -2,6 +2,7 @@
 
 import json
 import logging
+import os
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -14,26 +15,83 @@ from .models import StoredMemory
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Configuration
-MAX_MEMORIES = 1000
+# Configuration defaults
+DEFAULT_MAX_MEMORIES = 1000
+DEFAULT_STORAGE_DIR = ".data/memories"
+
+
+def get_memory_storage_dir() -> Path:
+    """Get memory storage directory from environment variable or default
+
+    Uses CLAUDE_PROJECT_DIR as base for relative paths when available,
+    ensuring correct path resolution when Amplifier is used as a submodule.
+
+    Returns:
+        Path to memory storage directory (defaults to .data/memories)
+    """
+    storage_dir = os.getenv("MEMORY_STORAGE_DIR", DEFAULT_STORAGE_DIR)
+    path = Path(storage_dir)
+
+    # If path is relative, resolve relative to CLAUDE_PROJECT_DIR
+    if not path.is_absolute():
+        project_dir = os.getenv("CLAUDE_PROJECT_DIR")
+        if project_dir:
+            path = Path(project_dir) / path
+            logger.info(f"[MEMORY CONFIG] Resolving relative path with CLAUDE_PROJECT_DIR: {path}")
+        else:
+            # Fallback to current working directory
+            path = path.resolve()
+            logger.info(f"[MEMORY CONFIG] No CLAUDE_PROJECT_DIR, using cwd: {path}")
+    else:
+        logger.info(f"[MEMORY CONFIG] Using absolute path: {path}")
+
+    return path
+
+
+def get_max_memories() -> int:
+    """Get maximum memories limit from environment variable or default
+
+    Returns:
+        Maximum number of memories to keep (defaults to 1000)
+    """
+    try:
+        max_memories = int(os.getenv("MEMORY_MAX_MEMORIES", str(DEFAULT_MAX_MEMORIES)))
+        # Validate: minimum 10, maximum 100000
+        if max_memories < 10:
+            logger.warning(f"MEMORY_MAX_MEMORIES too low ({max_memories}), using minimum: 10")
+            return 10
+        if max_memories > 100000:
+            logger.warning(f"MEMORY_MAX_MEMORIES too high ({max_memories}), using maximum: 100000")
+            return 100000
+        return max_memories
+    except ValueError:
+        logger.warning(f"Invalid MEMORY_MAX_MEMORIES value, using default: {DEFAULT_MAX_MEMORIES}")
+        return DEFAULT_MAX_MEMORIES
 
 
 class MemoryStore:
     """JSON-based memory storage with rotation and compatibility"""
 
-    def __init__(self, data_dir: Path | None = None, max_memories: int = MAX_MEMORIES):
+    def __init__(self, data_dir: Path | None = None, max_memories: int | None = None):
         """Initialize memory store
 
         Args:
-            data_dir: Directory for data storage, defaults to .data
-            max_memories: Maximum number of memories to keep
+            data_dir: Directory for data storage, defaults to MEMORY_STORAGE_DIR env var or .data/memories
+            max_memories: Maximum number of memories to keep, defaults to MEMORY_MAX_MEMORIES env var or 1000
         """
-        self.data_dir = data_dir or Path(".data")
+        self.data_dir = data_dir or get_memory_storage_dir()
         self.data_file = self.data_dir / "memory.json"
-        self.max_memories = max_memories
+        self.max_memories = max_memories if max_memories is not None else get_max_memories()
 
         logger.info(f"[MEMORY STORE] Initializing with data_dir: {self.data_dir}")
         logger.info(f"[MEMORY STORE] Data file path: {self.data_file}")
+        logger.info(f"[MEMORY STORE] Max memories: {self.max_memories}")
+        logger.info(
+            f"[MEMORY STORE] Storage source: {'explicit parameter' if data_dir else 'MEMORY_STORAGE_DIR env var'}"
+        )
+        logger.info(
+            f"[MEMORY STORE] Max memories source: {'explicit parameter' if max_memories is not None else 'MEMORY_MAX_MEMORIES env var'}"
+        )
 
         self._ensure_data_dir()
         self._data = self._load_data()
@@ -61,6 +119,7 @@ class MemoryStore:
 
         logger.info(f"[MEMORY STORE] Adding memory: {stored.category} - {stored.content[:50]}...")
         self._memories[stored.id] = stored
+        self._rotate_memories()  # Auto-rotate if limit exceeded
         self._save_memories()
         logger.info(f"[MEMORY STORE] Memory added, total now: {len(self._memories)}")
         return stored
