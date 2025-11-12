@@ -158,6 +158,49 @@ DDD builds on these principles:
 
 ---
 
+## Session Management for Large Implementations
+
+### The Challenge
+
+Large implementations can exhaust context windows during coding, causing:
+- Session compaction mid-implementation
+- Lost tracking state
+- Manual coordination across session boundaries
+- No automatic checkpointing
+
+### The Solution: Session-Aware Workflow
+
+The session-aware orchestrator enables seamless multi-session implementations:
+
+**Automatic state preservation**:
+- Token budget tracking
+- Checkpoint after every chunk
+- State persistence to files
+- PreCompact hook integration
+
+**Seamless resumption**:
+```bash
+# Resume from checkpoint
+make ddd-continue
+```
+
+**Key capabilities**:
+- **Token tracking**: Monitors usage, triggers handoffs before exhaustion
+- **Auto-checkpointing**: After chunks and before handoffs
+- **Sub-agent delegation**: Maximizes context savings
+- **Conflict detection**: Handles files modified externally
+
+**State files**:
+- `impl_status.md` - Human-readable progress
+- `session_manifest.json` - Machine-readable sessions
+- `checkpoints/` - Per-chunk state snapshots
+
+**Result**: Multi-session workflows feel like single sessions. State never lost.
+
+**Learn more**: [Phase 4: Session-Aware Implementation](phases/04_code_implementation_session_aware.md) | [Session Management Reference](reference/session_management.md)
+
+---
+
 ## The Complete Process
 
 ```
@@ -189,11 +232,12 @@ Phase 3: Implementation Planning
     • Detailed plan
     • Right-sizing check
     ↓
-Phase 4: Code Implementation
+Phase 4: Code Implementation (Session-Aware)
     ↓
     • Code matches docs exactly
-    • Load full context
-    • Commit incrementally
+    • Automatic state preservation
+    • Multi-session workflow
+    • Token budget tracking
     ↓
 Phase 5: Testing & Verification
     ↓
