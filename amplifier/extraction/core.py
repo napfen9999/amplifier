@@ -92,6 +92,9 @@ class MemoryExtractor:
     async def extract_from_messages(self, messages: list[dict[str, Any]], context: str | None = None) -> dict[str, Any]:
         """Extract memories from conversation messages using Claude Code SDK
 
+        ⚠️ DEPRECATED: Use extract_from_messages_intelligent() for better coverage
+        of large sessions. This method only processes the last N messages.
+
         Args:
             messages: List of conversation messages
             context: Optional context string
@@ -102,6 +105,10 @@ class MemoryExtractor:
         Raises:
             RuntimeError: If no messages provided or extraction fails
         """
+        logger.warning(
+            "[EXTRACTION] Using legacy extract_from_messages - consider using "
+            "extract_from_messages_intelligent() for better coverage of large sessions"
+        )
         logger.info(f"[EXTRACTION] extract_from_messages called with {len(messages)} messages")
 
         if not messages:
@@ -146,6 +153,59 @@ class MemoryExtractor:
 
         # Use existing extraction logic
         return await self.extract_from_messages(messages, context)
+
+    async def extract_from_messages_intelligent(
+        self,
+        messages: list[dict[str, Any]],
+        context: str | None = None,
+        filter_sidechain: bool = True,
+    ) -> dict[str, Any]:
+        """Extract memories using intelligent two-pass sampling
+
+        Uses LLM-driven triage to identify important message ranges,
+        then performs deep extraction only from those ranges.
+
+        This method provides better coverage for large sessions
+        without requiring manual configuration.
+
+        Args:
+            messages: Full message list from session
+            context: Optional context string
+            filter_sidechain: Whether to remove sidechain messages (default: True)
+
+        Returns:
+            Extraction result dictionary with memories and metadata
+
+        Raises:
+            RuntimeError: If extraction fails after retries
+        """
+        from amplifier.memory.filter import filter_sidechain_messages
+        from amplifier.memory.intelligent_sampling import two_pass_extraction
+
+        logger.info(f"[EXTRACTION] extract_from_messages_intelligent called with {len(messages)} messages")
+
+        # Check if intelligent sampling is enabled
+        if not self.config.intelligent_sampling_enabled:
+            logger.info("[EXTRACTION] Intelligent sampling disabled, using standard extraction")
+            return await self.extract_from_messages(messages, context)
+
+        # Apply sidechain filtering if requested
+        if filter_sidechain:
+            messages = filter_sidechain_messages(messages)
+            logger.info(f"[EXTRACTION] Filtered to {len(messages)} main-chain messages")
+
+        if not messages:
+            raise RuntimeError("No messages remaining after filtering")
+
+        # Use two-pass intelligent extraction
+        result = await two_pass_extraction(messages, self)
+
+        # Add context to metadata if provided
+        if context and "metadata" in result:
+            result["metadata"]["context"] = context
+
+        logger.info(f"[EXTRACTION] Intelligent extraction completed: {len(result.get('memories', []))} memories")
+        return result
 
     def _format_messages(self, messages: list[dict[str, Any]]) -> str:
         """Format messages for extraction - optimized for performance"""
