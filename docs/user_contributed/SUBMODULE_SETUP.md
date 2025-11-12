@@ -122,6 +122,7 @@ EOF
 # 3. Configure parent project .env (per-project control)
 cat > .env << 'EOF'
 MEMORY_SYSTEM_ENABLED=true
+MEMORY_MAX_MEMORIES=1000
 ANTHROPIC_API_KEY=your-api-key-here
 EOF
 
@@ -302,8 +303,15 @@ In your parent project root (NOT in the amplifier submodule):
 ```bash
 # your-project/.env
 MEMORY_SYSTEM_ENABLED=true     # Enable memory system for THIS project
+MEMORY_MAX_MEMORIES=1000       # Maximum memories to keep (rotation kicks in above this)
 ANTHROPIC_API_KEY=sk-...       # Your API key for LLM features
 ```
+
+**Available Memory Configuration:**
+- `MEMORY_SYSTEM_ENABLED`: Enable/disable memory system (`true`/`false`)
+- `MEMORY_MAX_MEMORIES`: Maximum memories to keep (default: 1000, range: 10-100000)
+  - When exceeded, oldest/least-accessed memories are automatically rotated out
+  - Higher values use more disk space but retain more history
 
 **Why This Works**:
 1. Hook loads **submodule `.env`** first (safe defaults: `MEMORY_SYSTEM_ENABLED=false`)

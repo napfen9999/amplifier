@@ -48,9 +48,17 @@ MEMORY_EXTRACTION_MAX_MEMORIES=10      # Max memories per session
 # Queue processing
 EXTRACTION_QUEUE_INTERVAL=30           # Background processor interval (seconds)
 
-# Storage location
+# Storage location (directory where memory.json will be stored)
+# The actual file will be at: <MEMORY_STORAGE_DIR>/memory.json
 MEMORY_STORAGE_DIR=.data/memories
+
+# Maximum total memories to keep in storage
+# When this limit is exceeded, oldest/least-accessed memories are rotated out
+# Range: 10-100000, Default: 1000
+MEMORY_MAX_MEMORIES=1000
 ```
+
+**Note**: The `MEMORY_STORAGE_DIR` and `MEMORY_MAX_MEMORIES` environment variables control storage behavior. All components (hooks, processor, CLI) automatically use these configured values.
 
 ## Architecture
 
@@ -168,7 +176,7 @@ After tool use (PostToolUse event), the system:
 
 ## Memory Storage Format
 
-Memories are stored in JSON format at `.data/memory.json`:
+Memories are stored in JSON format at `<MEMORY_STORAGE_DIR>/memory.json` (default: `.data/memories/memory.json`):
 
 ```json
 {
@@ -268,6 +276,54 @@ Logs are automatically rotated after 7 days.
    - Too many hook events in short period
    - Check logs for "Circuit breaker" messages
    - System will automatically recover after cooldown
+
+## Memory Rotation
+
+When the number of stored memories exceeds `MEMORY_MAX_MEMORIES`, automatic rotation removes the oldest/least-accessed memories.
+
+### How Rotation Works
+
+1. **Trigger**: Activated when memories exceed configured limit (default: 1000)
+
+2. **Sorting**: Memories are ranked by:
+   - **Primary**: Access count (how often retrieved)
+   - **Secondary**: Timestamp (how recent)
+
+3. **Removal**: Oldest and least-accessed memories are removed first
+
+4. **Retention**: Most valuable memories (frequently accessed + recent) are kept
+
+### Configuration
+
+```bash
+# Set custom limit via environment variable
+MEMORY_MAX_MEMORIES=5000  # Keep up to 5000 memories
+
+# Valid range: 10-100000
+# Values outside range are clamped to min/max
+```
+
+### Example
+
+**Before Rotation:**
+- 1100 memories in storage
+- Limit: 1000
+
+**After Rotation:**
+- 1000 memories retained (most accessed + recent)
+- 100 memories removed (rarely used + old)
+- Log message: `INFO: Rotated out 100 old memories`
+
+### Monitoring
+
+Check memory count in storage:
+```python
+from amplifier.memory import MemoryStore
+store = MemoryStore()
+count = len(store.get_all())
+print(f"Current memories: {count}")
+print(f"Limit: {store.max_memories}")
+```
 
 ## Performance Characteristics
 
