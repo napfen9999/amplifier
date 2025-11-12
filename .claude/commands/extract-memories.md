@@ -1,32 +1,35 @@
 ---
-description: Exit with optional memory extraction
+description: Extract memories from unprocessed transcripts
 category: memory-system
 allowed-tools: Bash, Read, BashOutput
 argument-hint: (No arguments) Prompts to extract | 'force' or 'now' to skip all checks
 ---
 
-# Claude Command: Exit
+# Claude Command: Extract Memories
 
 ## Primary Purpose
 
-Provide users with control over memory extraction when ending their Claude Code session. This command offers the choice to extract learnings from unprocessed transcripts before exiting, ensuring valuable insights aren't lost.
+Provide users with control over memory extraction from unprocessed transcripts. This command offers the choice to extract learnings, ensuring valuable insights aren't lost.
+
+**Note**: After extraction, use the built-in `/exit` command to close Claude Code.
 
 ## Core Behavior
 
-When the user runs `/exit`, the command:
+When the user runs `/extract-memories`, the command:
 
 1. **Checks for unprocessed transcripts** in `.data/transcripts/`
-2. **Prompts user**: "Extract memories before exit? (Y/n)"
+2. **Prompts user**: "Extract memories now? (Y/n)"
 3. **If Yes**: Runs synchronous extraction with visible progress
-4. **If No**: Exits immediately
+4. **If No**: Skips extraction (transcripts remain queued)
 5. **Shows summary** of memories extracted (if extraction ran)
+6. **Reminds user**: Use `/exit` to close Claude Code
 
 ## Understanding User Intent
 
 This command is typically used when:
-- User is ending their Claude Code session
 - User wants to capture learnings from current session
 - User prefers manual control over automatic background processing
+- User wants to ensure memories are extracted before ending session
 
 ## Implementation Approach
 
@@ -43,7 +46,7 @@ print(len(unprocessed))
 "
 ```
 
-If zero unprocessed transcripts → Skip extraction prompt, exit immediately
+If zero unprocessed transcripts → Skip extraction prompt, show status message
 
 ### Step 2: Prompt User
 
@@ -52,7 +55,7 @@ If unprocessed transcripts exist, present clear choice:
 ```
 📝 Found N unprocessed transcript(s)
 
-Extract memories before exit? (Y/n):
+Extract memories now? (Y/n):
 ```
 
 **Important**: This is the user's decision point. Respect their choice.
@@ -92,9 +95,9 @@ Current: Processing transcript def456...
 - Press Ctrl+C anytime to cancel → Graceful stop, progress preserved
 - Extraction state tracked → Can resume later with `/cleanup`
 
-### Step 3B: If User Chooses "No" - Exit Immediately
+### Step 3B: If User Chooses "No" - Skip Extraction
 
-Simply exit without extraction. Transcripts remain in queue for future processing.
+Skip extraction without processing. Transcripts remain in queue for future processing.
 
 ### Step 4: Show Completion Summary
 
@@ -111,32 +114,19 @@ Location:   .data/memories/
 Memories are now available in future sessions.
 ```
 
-### Step 5: Tell User Session Can Be Closed
+### Step 5: Remind User How to Close Session
 
 **CRITICAL**: Always end with this message:
 
 ```
-✅ Session complete.
+✅ Memory extraction complete.
 
-You can now:
-- Close Claude Code (Cmd/Ctrl+W)
-- Or continue working
+To close Claude Code:
+- Use the built-in /exit command
+- Or press Cmd/Ctrl+W
 ```
 
-This explicitly tells the user the `/exit` command has finished its work.
-
-After extraction completes (if run):
-
-```
-✅ Memory Extraction Complete
-
-Processed:  3 transcripts
-Extracted:  42 memories
-Duration:   2m 15s
-Location:   .data/memories/
-
-Memories are now available in future sessions.
-```
+This reminds the user that memory extraction is separate from closing Claude Code.
 
 ## Error Handling
 
@@ -155,7 +145,7 @@ To enable:
    ANTHROPIC_API_KEY=sk-ant-...
 3. Set MEMORY_SYSTEM_ENABLED=true
 
-For now, exiting without extraction.
+Skipping memory extraction. Use built-in /exit to close.
 ```
 
 ### Extraction Errors
