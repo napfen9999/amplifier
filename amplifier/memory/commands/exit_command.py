@@ -14,7 +14,8 @@ from pathlib import Path
 
 from amplifier.memory.extraction_logger import get_extraction_logger
 from amplifier.memory.transcript_tracker import add_transcript_record
-from amplifier.memory.watchdog import get_extraction_status, start_extraction
+from amplifier.memory.watchdog import get_extraction_status
+from amplifier.memory.watchdog import start_extraction
 
 
 def handle_exit(session_id: str, transcript_path: Path) -> dict[str, bool | str]:
@@ -80,14 +81,13 @@ def handle_exit(session_id: str, transcript_path: Path) -> dict[str, bool | str]
                 "message": "Transcript registered and extraction started",
                 "extraction_started": True,
             }
-        else:
-            # Should not happen (start_extraction returns False only if already running)
-            logger.warning("Extraction not started (unexpected)")
-            return {
-                "success": True,
-                "message": "Transcript registered",
-                "extraction_started": False,
-            }
+        # Should not happen (start_extraction returns False only if already running)
+        logger.warning("Extraction not started (unexpected)")
+        return {
+            "success": True,
+            "message": "Transcript registered",
+            "extraction_started": False,
+        }
 
     except Exception as e:
         logger.error(f"Failed to start extraction: {e}", exc_info=True)
@@ -117,7 +117,7 @@ def get_exit_command_status() -> dict[str, str | int]:
             "message": "No extraction in progress",
         }
 
-    elif status.status == "running":
+    if status.status == "running":
         return {
             "status": "running",
             "message": f"Extraction in progress: {status.transcripts_completed}/{status.transcripts_total} transcripts",
@@ -126,7 +126,7 @@ def get_exit_command_status() -> dict[str, str | int]:
             "memories_extracted": status.memories_extracted,
         }
 
-    elif status.status == "completed":
+    if status.status == "completed":
         return {
             "status": "completed",
             "message": f"Extraction complete: {status.transcripts_completed} transcripts, {status.memories_extracted} memories",
@@ -135,7 +135,7 @@ def get_exit_command_status() -> dict[str, str | int]:
             "memories_extracted": status.memories_extracted,
         }
 
-    elif status.status == "failed":
+    if status.status == "failed":
         return {
             "status": "failed",
             "message": f"Extraction failed: {status.transcripts_completed}/{status.transcripts_total} transcripts completed",
@@ -144,7 +144,7 @@ def get_exit_command_status() -> dict[str, str | int]:
             "memories_extracted": status.memories_extracted,
         }
 
-    elif status.status == "crashed":
+    if status.status == "crashed":
         return {
             "status": "crashed",
             "message": f"Extraction crashed: {status.transcripts_completed}/{status.transcripts_total} transcripts completed before crash",
@@ -153,8 +153,7 @@ def get_exit_command_status() -> dict[str, str | int]:
             "memories_extracted": status.memories_extracted,
         }
 
-    else:
-        return {
-            "status": "unknown",
-            "message": f"Unknown status: {status.status}",
-        }
+    return {
+        "status": "unknown",
+        "message": f"Unknown status: {status.status}",
+    }

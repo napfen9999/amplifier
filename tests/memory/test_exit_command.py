@@ -6,8 +6,11 @@ from unittest.mock import patch
 
 import pytest
 
-from amplifier.memory.commands.exit_command import get_exit_command_status, handle_exit
-from amplifier.memory.state_tracker import ExtractionState, TranscriptState, save_extraction_state
+from amplifier.memory.commands.exit_command import get_exit_command_status
+from amplifier.memory.commands.exit_command import handle_exit
+from amplifier.memory.state_tracker import ExtractionState
+from amplifier.memory.state_tracker import TranscriptState
+from amplifier.memory.state_tracker import save_extraction_state
 from amplifier.memory.transcript_tracker import get_transcript_by_session
 from amplifier.memory.watchdog import ExtractionStatus
 
@@ -279,16 +282,15 @@ def test_handle_exit_multiple_sessions_sequence(temp_data_dir):
         if call_count[0] == 1:
             # First call: idle
             return ExtractionStatus(status="idle")
-        else:
-            # Subsequent calls: running
-            return ExtractionStatus(
-                status="running",
-                pid=12345,
-                started_at="2025-11-12T15:30:00",
-                transcripts_total=3,
-                transcripts_completed=0,
-                memories_extracted=0,
-            )
+        # Subsequent calls: running
+        return ExtractionStatus(
+            status="running",
+            pid=12345,
+            started_at="2025-11-12T15:30:00",
+            transcripts_total=3,
+            transcripts_completed=0,
+            memories_extracted=0,
+        )
 
     with (
         patch("amplifier.memory.commands.exit_command.get_extraction_status", side_effect=mock_status_progression),

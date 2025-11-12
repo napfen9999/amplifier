@@ -1,6 +1,5 @@
 """Tests for terminal progress UI"""
 
-
 from amplifier.memory.terminal_ui import ProgressState
 from amplifier.memory.terminal_ui import TerminalUI
 

@@ -6,7 +6,8 @@ from unittest.mock import patch
 
 import pytest
 
-from amplifier.memory.hooks.session_end import get_hook_status, handle_session_end
+from amplifier.memory.hooks.session_end import get_hook_status
+from amplifier.memory.hooks.session_end import handle_session_end
 
 
 @pytest.fixture
