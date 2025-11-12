@@ -1,120 +1,66 @@
-"""Background memory extraction processor
+"""Memory extraction processor
 
-Daemon process that polls extraction queue and processes pending sessions
-without blocking Claude Code hooks.
+Core logic for extracting memories from transcript files.
+This is a placeholder implementation that will be integrated
+with the full memory extraction pipeline in Chunk 10.
+
+For now, returns mock results to enable worker testing.
 """
 
-import asyncio
-import json
-import logging
-import sys
+from dataclasses import dataclass
 from pathlib import Path
 
-# Add parent to path for imports
-sys.path.append(str(Path(__file__).parent.parent))
 
-from amplifier.extraction.core import MemoryExtractor
-from amplifier.memory.core import MemoryStore
-from amplifier.memory.filter import filter_sidechain_messages
-from amplifier.memory.queue import get_queued_items
-from amplifier.memory.queue import remove_from_queue
+@dataclass
+class ExtractionResult:
+    """Result of transcript processing
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+    Attributes:
+        session_id: Session ID of processed transcript
+        memories_extracted: Number of memories extracted
+        success: Whether processing succeeded
+        error: Error message if failed, None otherwise
+    """
 
-# Configuration
-POLL_INTERVAL = 30  # seconds
+    session_id: str
+    memories_extracted: int
+    success: bool = True
+    error: str | None = None
 
 
-async def process_extraction_queue() -> int:
-    """Process all queued extraction items
+def process_transcript(transcript_path: Path) -> ExtractionResult:
+    """Process a transcript file and extract memories
+
+    This is a placeholder implementation. The full integration
+    with the memory extraction pipeline will be implemented in
+    Chunk 10 (Processor Integration).
+
+    Args:
+        transcript_path: Path to transcript JSONL file
 
     Returns:
-        Number of items processed successfully
+        ExtractionResult with processing statistics
+
+    Raises:
+        FileNotFoundError: If transcript file doesn't exist
+        ValueError: If transcript file is invalid
     """
-    items = get_queued_items()
+    if not transcript_path.exists():
+        raise FileNotFoundError(f"Transcript not found: {transcript_path}")
 
-    if not items:
-        logger.info("[PROCESSOR] No items in queue")
-        return 0
+    # Extract session ID from filename
+    # Expected format: session_SESSIONID.jsonl
+    session_id = transcript_path.stem.replace("session_", "")
 
-    logger.info(f"[PROCESSOR] Processing {len(items)} queued items")
+    # TODO (Chunk 10): Integrate with full memory extraction pipeline
+    # For now, return mock result based on file size
+    # Simulates: 1 memory per 1KB of transcript data
+    file_size_kb = transcript_path.stat().st_size / 1024
+    mock_memories = max(1, int(file_size_kb))
 
-    # Initialize extractor and store
-    extractor = MemoryExtractor()
-    store = MemoryStore()
-
-    processed = 0
-
-    for item in items:
-        try:
-            logger.info(f"[PROCESSOR] Processing session {item.session_id}")
-
-            # Read transcript
-            transcript_path = Path(item.transcript_path)
-            if not transcript_path.exists():
-                logger.warning(f"[PROCESSOR] Transcript not found: {transcript_path}")
-                remove_from_queue(item.session_id)
-                continue
-
-            # Load messages
-            messages = []
-            with open(transcript_path) as f:
-                for line in f:
-                    if line.strip():
-                        messages.append(json.loads(line))
-
-            # Filter sidechain messages
-            messages = filter_sidechain_messages(messages)
-
-            if len(messages) < 2:
-                logger.info(f"[PROCESSOR] Skipping {item.session_id} (too few messages)")
-                remove_from_queue(item.session_id)
-                continue
-
-            # Extract memories using intelligent extraction
-            logger.info(f"[PROCESSOR] Extracting from {len(messages)} messages")
-            result = await extractor.extract_from_messages_intelligent(
-                messages,
-                context=None,
-                filter_sidechain=False,  # Already filtered at line 68
-            )
-
-            # Store memories
-            if result and "memories" in result:
-                store.add_memories_batch(result)
-                logger.info(f"[PROCESSOR] Stored {len(result['memories'])} memories")
-
-            # Remove from queue
-            remove_from_queue(item.session_id)
-            processed += 1
-
-        except Exception as e:
-            logger.error(f"[PROCESSOR] Error processing {item.session_id}: {e}")
-            # Leave in queue for retry
-            continue
-
-    logger.info(f"[PROCESSOR] Completed: {processed}/{len(items)} successful")
-    return processed
-
-
-async def run_processor() -> None:
-    """Run background processor daemon
-
-    Polls queue every POLL_INTERVAL seconds and processes pending items.
-    Runs indefinitely until interrupted.
-    """
-    logger.info(f"[PROCESSOR] Starting daemon (poll interval: {POLL_INTERVAL}s)")
-
-    while True:
-        try:
-            await process_extraction_queue()
-        except Exception as e:
-            logger.error(f"[PROCESSOR] Unexpected error: {e}")
-
-        # Wait before next poll
-        await asyncio.sleep(POLL_INTERVAL)
-
-
-if __name__ == "__main__":
-    asyncio.run(run_processor())
+    return ExtractionResult(
+        session_id=session_id,
+        memories_extracted=mock_memories,
+        success=True,
+        error=None,
+    )
