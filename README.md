@@ -286,9 +286,15 @@ Execute a complete feature workflow with numbered slash commands:
 /ddd:1-plan         # Design the feature
 /ddd:2-docs         # Update all docs (iterate until approved)
 /ddd:3-code-plan    # Plan code changes
-/ddd:4-code         # Implement and test (iterate until working)
+/ddd:4-code         # Implement and test (session-aware)
 /ddd:5-finish       # Clean up and finalize
 ```
+
+**Session-aware implementation**: Phase 4 automatically manages multi-session workflows:
+- **Token budget tracking**: Automatically checkpoints before context exhaustion
+- **Seamless resumption**: `make ddd-continue` resumes from last checkpoint
+- **State persistence**: Never lose progress across session boundaries
+- **Sub-agent delegation**: Maximizes context savings through specialized agents
 
 Each phase creates artifacts the next phase reads. You control all git operations with explicit authorization at every step. The workflow prevents expensive mistakes by catching design flaws before implementation.
 
