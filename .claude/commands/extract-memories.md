@@ -1,35 +1,32 @@
 ---
-description: Extract memories from transcripts before closing session
+description: Exit with optional memory extraction
 category: memory-system
 allowed-tools: Bash, Read, BashOutput
 argument-hint: (No arguments) Prompts to extract | 'force' or 'now' to skip all checks
 ---
 
-# Claude Command: Extract Memories
+# Claude Command: Exit
 
 ## Primary Purpose
 
-Provide users with control over memory extraction from unprocessed transcripts. This command offers the choice to extract learnings, ensuring valuable insights aren't lost.
-
-**Note**: After extraction completes, use the built-in `/exit` command to close Claude Code.
+Provide users with control over memory extraction when ending their Claude Code session. This command offers the choice to extract learnings from unprocessed transcripts before exiting, ensuring valuable insights aren't lost.
 
 ## Core Behavior
 
-When the user runs `/extract-memories`, the command:
+When the user runs `/exit`, the command:
 
 1. **Checks for unprocessed transcripts** in `.data/transcripts/`
-2. **Prompts user**: "Extract memories now? (Y/n)"
+2. **Prompts user**: "Extract memories before exit? (Y/n)"
 3. **If Yes**: Runs synchronous extraction with visible progress
-4. **If No**: Skips extraction (transcripts remain queued)
+4. **If No**: Exits immediately
 5. **Shows summary** of memories extracted (if extraction ran)
-6. **Reminds user**: Use `/exit` to close Claude Code
 
 ## Understanding User Intent
 
 This command is typically used when:
+- User is ending their Claude Code session
 - User wants to capture learnings from current session
 - User prefers manual control over automatic background processing
-- User wants to ensure memories are extracted before ending session
 
 ## Implementation Approach
 
@@ -114,19 +111,19 @@ Location:   .data/memories/
 Memories are now available in future sessions.
 ```
 
-### Step 5: Remind User How to Close Session
+### Step 5: Tell User Session Can Be Closed
 
 **CRITICAL**: Always end with this message:
 
 ```
-✅ Memory extraction complete.
+✅ Session complete.
 
-To close Claude Code:
-- Use the built-in `/exit` command
-- Or press Cmd/Ctrl+W
+You can now:
+- Close Claude Code (Cmd/Ctrl+W)
+- Or continue working
 ```
 
-This reminds the user that memory extraction is separate from closing Claude Code.
+This explicitly tells the user the `/exit` command has finished its work.
 
 After extraction completes (if run):
 
