@@ -2,7 +2,7 @@
 description: Exit with optional memory extraction
 category: memory-system
 allowed-tools: Bash, Read, BashOutput
-argument-hint: (No arguments) Prompts to extract memories before exit
+argument-hint: (No arguments) Prompts to extract | 'force' or 'now' to skip all checks
 ---
 
 # Claude Command: Exit
@@ -97,6 +97,33 @@ Current: Processing transcript def456...
 Simply exit without extraction. Transcripts remain in queue for future processing.
 
 ### Step 4: Show Completion Summary
+
+After extraction completes (if run):
+
+```
+✅ Memory Extraction Complete
+
+Processed:  3 transcripts
+Extracted:  42 memories
+Duration:   2m 15s
+Location:   .data/memories/
+
+Memories are now available in future sessions.
+```
+
+### Step 5: Tell User Session Can Be Closed
+
+**CRITICAL**: Always end with this message:
+
+```
+✅ Session complete.
+
+You can now:
+- Close Claude Code (Cmd/Ctrl+W)
+- Or continue working
+```
+
+This explicitly tells the user the `/exit` command has finished its work.
 
 After extraction completes (if run):
 
