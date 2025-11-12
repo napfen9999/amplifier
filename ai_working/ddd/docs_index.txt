@@ -1,12 +1,7 @@
-# DDD Phase 2: Non-Code Files Index
-# Format: [ ] = pending, [x] = completed
-# Process one file at a time using file crawling technique
-
-[x] docs/MEMORY_SYSTEM.md
-[x] HOTFIX_SUBAGENT_STOP.md
-[x] MEMORY_SYSTEM_ARCHITECTURE_ANALYSIS.md
-[x] .env.example
-[x] .claude/README.md
-
-# Total: 5 files to update
-# Status: 0/5 completed
+[ ] ai_working/integration/baseline/hooks-inventory.md
+[ ] ai_working/integration/baseline/commands-inventory.md
+[ ] ai_working/integration/baseline/agents-inventory.md
+[ ] ai_working/integration/baseline/scenarios-inventory.md
+[ ] ai_working/integration/baseline/functionality-test-results.md
+[ ] ai_working/integration/baseline/amplifier-baseline-master.md
+[ ] ai_working/integration/baseline/git-state.txt
