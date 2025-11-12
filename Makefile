@@ -246,6 +246,19 @@ worktree-adopt: ## Create worktree from remote branch. Usage: make worktree-adop
 worktree-list-stashed: ## List all hidden worktrees
 	@python tools/worktree_manager.py list-stashed
 
+# DDD (Document-Driven Development) Session Management
+ddd-continue: ## Resume DDD implementation from last checkpoint
+	@echo "Resuming DDD session from last checkpoint..."
+	@uv run python tools/ddd_orchestrator.py --resume
+
+ddd-status: ## Show current DDD implementation progress
+	@echo "DDD Implementation Status:"
+	@uv run python tools/ddd_orchestrator.py --status
+
+ddd-checkpoint: ## Force DDD checkpoint (save current state)
+	@echo "Creating DDD checkpoint..."
+	@uv run python tools/ddd_orchestrator.py --checkpoint
+
 # Catch-all target to handle branch names for worktree functionality
 # and show error for invalid commands
 %:
