@@ -367,6 +367,52 @@ make transcript-search TERM="auth"  # Search past conversations
 make transcript-restore             # Restore full lineage (for CLI use)
 ```
 
+### 🧠 Memory System
+
+**Persistent memory across sessions.** The Amplifier Memory System extracts key learnings, decisions, and solutions from your conversations and makes them available in future sessions.
+
+The system provides two extraction workflows:
+
+**1. Background Processing (Automatic)**
+- Transcripts queued automatically on session end
+- Background processor extracts memories asynchronously
+- No user interaction required
+
+**2. Exit Command (Manual - User Controlled)**
+- Extract memories when ending Claude Code session
+- Synchronous extraction with visible progress
+- Full control over when extraction happens
+
+```bash
+/exit  # Prompts: Extract memories before exit? (Y/n)
+```
+
+**Key features**:
+- **Two-Pass Intelligent Extraction** - Automatically identifies important conversation segments
+- **Queue-based architecture** - Fast hooks + background processing
+- **Persistent storage** - Memories preserved across sessions
+- **Crash recovery** - Resume interrupted extractions
+- **Transcript tracking** - Know what's been processed
+
+**Memory Commands**:
+
+```bash
+/exit                # Exit with optional memory extraction
+/cleanup             # Manage extraction state and recovery
+```
+
+**Configuration** (requires Anthropic API key):
+
+```bash
+# In your .env file
+MEMORY_SYSTEM_ENABLED=true
+ANTHROPIC_API_KEY=sk-ant-...  # Get at console.anthropic.com
+```
+
+- _Tell Claude Code:_ `Help me set up the memory system`
+
+- _View the documentation:_ [Memory System Guide](docs/MEMORY_SYSTEM.md)
+
 ### 🏗️ Workspace Pattern for Serious Projects
 
 **For long-term development**, consider using the workspace pattern where Amplifier hosts your project as a git submodule. This architectural approach provides:

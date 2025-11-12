@@ -1,0 +1,9 @@
+[x] docs/EXIT_COMMAND.md
+[x] docs/CLEANUP_COMMAND.md
+[x] docs/TRANSCRIPT_TRACKING.md
+[x] docs/EXTRACTION_WORKER.md
+[x] docs/CRASH_RECOVERY.md
+[x] docs/MEMORY_SYSTEM.md
+[x] README.md
+[x] .claude/commands/exit.md
+[x] .claude/commands/cleanup.md
