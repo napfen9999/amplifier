@@ -4,7 +4,7 @@
 
 **Complete guide for integrating Amplifier as a git submodule in other projects**
 
-**Last Updated**: 2025-11-10
+**Last Updated**: 2025-11-12
 **Tested With**: Brand Composer Amplifier (reference implementation)
 **Status**: ✅ Production-Ready
 
@@ -17,9 +17,11 @@
 3. [Quick Start](#quick-start)
 4. [Step-by-Step Setup](#step-by-step-setup)
 5. [Dependency Management](#dependency-management)
-6. [Verification](#verification)
-7. [Troubleshooting](#troubleshooting)
-8. [Automated Setup Script](#automated-setup-script)
+6. [Using Session-Aware DDD Tools](#using-session-aware-ddd-tools)
+7. [Submodule Branch Merging](#submodule-branch-merging)
+8. [Verification](#verification)
+9. [Troubleshooting](#troubleshooting)
+10. [Automated Setup Script](#automated-setup-script)
 
 ---
 
@@ -607,6 +609,218 @@ cat pyproject.toml
 # Install any new dependencies
 cd ..
 uv pip install <new-dependencies>
+```
+
+---
+
+## Using Session-Aware DDD Tools
+
+Amplifier includes Session-Aware Document-Driven Development (DDD) tools that enable seamless multi-session implementations with automatic state persistence.
+
+### What is Session-Aware DDD?
+
+A system for managing DDD Phase 4 (Code Implementation) across multiple Claude Code sessions:
+- **Token budget tracking** - Automatic session handoff before context exhaustion
+- **State persistence** - File-based checkpoints preserve progress
+- **Conflict detection** - Safe resumption after manual file edits
+- **Agent delegation** - Automatic selection of optimal agents for each task
+
+### Running DDD Tools from Parent Directory
+
+**With Submodule Setup** (recommended approach):
+
+```bash
+# Option 1: Work directly in submodule (simplest)
+cd amplifier
+PYTHONPATH=. uv run python tools/ddd_orchestrator.py status
+
+# Option 2: From parent directory with explicit paths
+PYTHONPATH=amplifier uv run python amplifier/tools/ddd_orchestrator.py status
+
+# Option 3: Using make commands (if defined in submodule)
+cd amplifier && make ddd-status
+```
+
+### Available DDD Commands
+
+```bash
+# Check current session status
+python tools/ddd_orchestrator.py status
+
+# Start new implementation session
+python tools/ddd_orchestrator.py start --code-plan ai_working/ddd/code_plan.md
+
+# Resume from checkpoint
+python tools/ddd_orchestrator.py resume
+
+# Create manual checkpoint
+python tools/ddd_orchestrator.py checkpoint
+```
+
+### Understanding "Active: Yes/No" Status
+
+When you run `ddd_orchestrator.py status`, you'll see:
+
+```
+📊 DDD SESSION STATUS
+============================================================
+Active: ✅ Yes    # DDD Phase 4 session is running
+Active: ❌ No     # No DDD session active
+```
+
+**What "Active" means**:
+- **Yes**: `ai_working/ddd/impl_status.md` exists and contains session data
+  - Hooks are logging file modifications automatically
+  - Emergency checkpoints created before compaction
+  - Session can be resumed if interrupted
+
+- **No**: No active DDD session
+  - Hooks operate normally but don't log DDD state
+  - No session management overhead
+  - Safe to start new session with `start` command
+
+**Files Created During Active Session**:
+- `ai_working/ddd/impl_status.md` - Human-readable progress log
+- `ai_working/ddd/session_manifest.json` - Machine-readable session tracking
+- `ai_working/ddd/checkpoints/*.json` - Per-chunk state snapshots
+
+### Testing DDD Tools
+
+Create a simple test plan:
+
+```bash
+# In amplifier directory
+cat > ai_working/ddd/test_plan.md << 'EOF'
+## Chunk 1.1: Test Module
+**File**: tests/demo_test.py
+**Complexity**: simple
+**Dependencies**: none
+EOF
+
+# Run orchestrator
+PYTHONPATH=. uv run python tools/ddd_orchestrator.py start \
+  --code-plan ai_working/ddd/test_plan.md
+```
+
+### DDD Tools Architecture
+
+**Core Modules** (all in `tools/`):
+- `ddd_state_manager.py` - State file I/O operations
+- `ddd_chunk_analyzer.py` - Parse code plans, resolve dependencies
+- `ddd_budget_tracker.py` - Token estimation and handoff triggers
+- `ddd_agent_selector.py` - Dynamic agent discovery and selection
+- `ddd_conflict_detector.py` - Git-based conflict detection
+- `ddd_hooks.py` - Hook handlers (automatic file tracking)
+- `ddd_orchestrator.py` - Main session loop and CLI
+
+**See Also**:
+- `docs/document_driven_development/reference/session_management.md` - Technical reference
+- `ai_working/ddd/test_report.md` - Implementation test results
+
+---
+
+## Submodule Branch Merging
+
+### Will DDD Tools Work After Merging to Main?
+
+**Yes!** Once you merge the `feature/session-aware-ddd` branch to `main` in the submodule, everything continues working automatically in the parent directory.
+
+### How It Works
+
+**Current Setup** (before merge):
+```
+parent-repo/                   # Your Brand Composer project
+├── .claude -> amplifier/.claude   # Symlink (works with any branch)
+└── amplifier/                 # Submodule
+    ├── .git (on feature/session-aware-ddd branch)
+    └── tools/ddd_orchestrator.py  # ✅ Available now
+```
+
+**After Merging** (feature → main):
+```
+parent-repo/                   # Nothing changes here!
+├── .claude -> amplifier/.claude   # Same symlink
+└── amplifier/                 # Submodule
+    ├── .git (on main branch)  # Just switched branch
+    └── tools/ddd_orchestrator.py  # ✅ Still available
+```
+
+**The symlink doesn't care which branch** - it points to `amplifier/.claude/`, which exists on both branches.
+
+### Merge Workflow
+
+**Step 1: Merge in Submodule** (do this in the submodule):
+```bash
+cd amplifier
+
+# Merge feature to main
+git checkout main
+git merge feature/session-aware-ddd
+git push origin main
+
+# Verify DDD tools present
+ls tools/ddd_*.py  # Should show all 7 modules
+```
+
+**Step 2: Update Parent Submodule Pointer** (optional, for others):
+```bash
+cd ..  # Back to parent directory
+
+# Update submodule reference
+git add amplifier
+git commit -m "chore: Update amplifier submodule to include Session-Aware DDD"
+git push origin main
+```
+
+**Step 3: Others Pull Changes**:
+```bash
+# Other developers update their submodule
+git pull
+git submodule update --remote amplifier
+
+# DDD tools now available for them too
+```
+
+### Testing After Merge
+
+Verify everything still works:
+
+```bash
+# From parent directory
+cd amplifier
+python tools/ddd_orchestrator.py status
+# Should work identically
+
+# Symlinks still valid
+ls -la ../.claude
+# Should show: .claude -> amplifier/.claude
+```
+
+### Important: Branch Independence
+
+**Key Insight**: The submodule branch doesn't affect the parent directory integration!
+
+- Symlinks work with **any** branch in the submodule
+- DDD tools available as long as they exist in the **current** branch
+- Switching branches in submodule doesn't break parent directory
+
+**Example**:
+```bash
+# Switch submodule to different branch
+cd amplifier
+git checkout experimental-feature
+cd ..
+
+# Symlink still works
+ls .claude/commands/  # Shows commands from experimental-feature branch
+
+# Switch back
+cd amplifier
+git checkout main
+cd ..
+
+# Symlink still works
+ls .claude/commands/  # Shows commands from main branch
 ```
 
 ---
