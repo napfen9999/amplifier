@@ -4,7 +4,6 @@ Tests the complete flow from session end through extraction to storage.
 """
 
 import json
-import tempfile
 from pathlib import Path
 from unittest.mock import AsyncMock
 from unittest.mock import patch
@@ -17,10 +16,29 @@ from amplifier.memory.transcript_tracker import get_transcript_by_session
 
 
 @pytest.fixture
-def temp_transcripts_dir():
-    """Create temporary transcripts directory"""
-    with tempfile.TemporaryDirectory() as tmpdir:
+def temp_transcripts_dir(monkeypatch):
+    """Create temporary transcripts directory with isolated state"""
+    import tempfile as tmp
+
+    with tmp.TemporaryDirectory() as tmpdir:
         transcripts_dir = Path(tmpdir)
+
+        # Create isolated data directory for this test
+        data_dir = Path(tmpdir) / ".data"
+        data_dir.mkdir()
+
+        # Patch the transcript tracker to use test directory
+        import amplifier.memory.transcript_tracker as tracker_module
+
+        tracker_file = data_dir / "transcripts.json"
+        monkeypatch.setattr(tracker_module, "TRANSCRIPTS_FILE", tracker_file)
+
+        # Patch state tracker to use test directory
+        import amplifier.memory.state_tracker as state_module
+
+        state_file = data_dir / ".extraction_state.json"
+        monkeypatch.setattr(state_module, "STATE_FILE", state_file)
+
         yield transcripts_dir
 
 
