@@ -304,7 +304,7 @@ In your parent project root (NOT in the amplifier submodule):
 # your-project/.env
 MEMORY_SYSTEM_ENABLED=true     # Enable memory system for THIS project
 MEMORY_MAX_MEMORIES=1000       # Maximum memories to keep (rotation kicks in above this)
-ANTHROPIC_API_KEY=sk-...       # Your API key for LLM features
+ANTHROPIC_API_KEY=sk-ant-...   # REQUIRED for memory extraction (get at console.anthropic.com)
 ```
 
 **Available Memory Configuration:**
@@ -312,6 +312,12 @@ ANTHROPIC_API_KEY=sk-...       # Your API key for LLM features
 - `MEMORY_MAX_MEMORIES`: Maximum memories to keep (default: 1000, range: 10-100000)
   - When exceeded, oldest/least-accessed memories are automatically rotated out
   - Higher values use more disk space but retain more history
+- `ANTHROPIC_API_KEY`: **REQUIRED** for memory extraction (LLM-based memory generation)
+  - Get your API key at https://console.anthropic.com/settings/keys
+  - Add credits to your Anthropic Console account (pay-as-you-go billing)
+  - **Note**: Your Claude Code subscription (Pro/Max) **cannot** be used for the SDK
+  - The Memory System uses the Anthropic API (separate billing) for programmatic access
+  - Memory extraction with Haiku 4.5 is very cost-effective (~$0.001-0.01 per session)
 
 **Why This Works**:
 1. Hook loads **submodule `.env`** first (safe defaults: `MEMORY_SYSTEM_ENABLED=false`)

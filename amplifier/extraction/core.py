@@ -37,6 +37,8 @@ class MemoryExtractor:
 
     def __init__(self):
         """Initialize the extractor and check for required dependencies"""
+        import os
+
         logger.info("[EXTRACTION] Initializing MemoryExtractor")
         # Import and load configuration
         from amplifier.extraction.config import get_config
@@ -56,6 +58,16 @@ class MemoryExtractor:
                 "Claude CLI not found. Memory extraction requires Claude CLI. "
                 "Install with: npm install -g @anthropic-ai/claude-code"
             )
+
+        # Check if API key is configured
+        api_key = os.getenv("ANTHROPIC_API_KEY")
+        if not api_key:
+            logger.warning(
+                "[EXTRACTION] ANTHROPIC_API_KEY not set. Memory extraction will fail. "
+                "Set ANTHROPIC_API_KEY in your .env file or use Claude Code subscription if available."
+            )
+        else:
+            logger.info("[EXTRACTION] ANTHROPIC_API_KEY found")
 
         logger.info("[EXTRACTION] Claude Code SDK and CLI verified - ready for extraction")
 
@@ -147,12 +159,33 @@ class MemoryExtractor:
         logger.info(f"[EXTRACTION] Processing {len(messages_to_process)} of {len(messages)} total messages")
 
         for msg in messages_to_process:
-            role = msg.get("role", "unknown")
+            # Handle Claude Code transcript format: {"type": "user", "message": {"role": "user", "content": [...]}}
+            # Also handle simple format: {"role": "user", "content": "..."}
+            if "message" in msg and isinstance(msg["message"], dict):
+                # Claude Code transcript format
+                inner_message = msg["message"]
+                role = inner_message.get("role", msg.get("type", "unknown"))
+                content = inner_message.get("content", "")
+            else:
+                # Simple format
+                role = msg.get("role", msg.get("type", "unknown"))
+                content = msg.get("content", "")
+
             # Skip non-conversation roles early
             if role not in ["user", "assistant"]:
                 continue
 
-            content = msg.get("content", "")
+            # Handle content as list (Claude Code format) or string
+            if isinstance(content, list):
+                # Extract text from content blocks
+                text_parts = []
+                for block in content:
+                    if isinstance(block, dict) and block.get("type") == "text":
+                        text_parts.append(block.get("text", ""))
+                content = " ".join(text_parts)
+            elif not isinstance(content, str):
+                content = str(content)
+
             if not content:
                 continue
 
@@ -303,6 +336,9 @@ Return ONLY valid JSON."""
                         logger.warning("[EXTRACTION] Empty response from Claude Code SDK")
                         return None
 
+                    # Log response for debugging (using INFO to ensure it's visible)
+                    logger.info(f"[EXTRACTION] Raw response: {response}")
+
                     # Clean and parse JSON
                     cleaned = response.strip()
                     if cleaned.startswith("```json"):
@@ -314,6 +350,7 @@ Return ONLY valid JSON."""
                     cleaned = cleaned.strip()
 
                     logger.info("[EXTRACTION] Parsing JSON response")
+                    logger.info(f"[EXTRACTION] Cleaned response: {cleaned}")
                     data = json.loads(cleaned)
                     data["metadata"] = {"extraction_method": "claude_sdk", "timestamp": datetime.now().isoformat()}
 
@@ -326,11 +363,41 @@ Return ONLY valid JSON."""
             )
         except json.JSONDecodeError as e:
             logger.error(f"[EXTRACTION] Failed to parse extraction response: {e}")
+            # Check if response looks like an error message
+            if response and len(response) < 300:
+                logger.error(f"[EXTRACTION] Response was: {response}")
+                if "credit" in response.lower() or "balance" in response.lower():
+                    logger.error(
+                        "[EXTRACTION] ⚠️  INSUFFICIENT CREDITS: Your Anthropic API account has insufficient credits. "
+                        "Please add credits at https://console.anthropic.com/ or check your billing settings."
+                    )
+                elif "api" in response.lower() and "key" in response.lower():
+                    logger.error(
+                        "[EXTRACTION] ⚠️  INVALID API KEY: Your ANTHROPIC_API_KEY is invalid or not set correctly. "
+                        "Check your .env file and ensure the key is valid."
+                    )
         except Exception as e:
-            logger.error(f"[EXTRACTION] Claude Code SDK extraction error: {e}")
-            import traceback
+            error_message = str(e)
+            logger.error(f"[EXTRACTION] Claude Code SDK extraction error: {error_message}")
 
-            logger.error(f"[EXTRACTION] Traceback: {traceback.format_exc()}")
+            # Provide helpful error messages for common issues
+            if "authentication" in error_message.lower() or "api key" in error_message.lower():
+                logger.error(
+                    "[EXTRACTION] ⚠️  AUTHENTICATION ERROR: Check your ANTHROPIC_API_KEY in .env file. "
+                    "Get a key at https://console.anthropic.com/settings/keys"
+                )
+            elif "rate limit" in error_message.lower():
+                logger.error(
+                    "[EXTRACTION] ⚠️  RATE LIMIT: Too many requests. The system will retry later automatically."
+                )
+            elif "insufficient" in error_message.lower() or "credit" in error_message.lower():
+                logger.error(
+                    "[EXTRACTION] ⚠️  INSUFFICIENT CREDITS: Add credits at https://console.anthropic.com/settings/plans"
+                )
+            else:
+                import traceback
+
+                logger.error(f"[EXTRACTION] Traceback: {traceback.format_exc()}")
 
         return None
 
