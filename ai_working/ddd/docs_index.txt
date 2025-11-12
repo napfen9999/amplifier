@@ -4,6 +4,10 @@
 [x] docs/EXTRACTION_WORKER.md
 [x] docs/CRASH_RECOVERY.md
 [x] docs/MEMORY_SYSTEM.md
+[x] docs/document_driven_development/phases/04_code_implementation_session_aware.md
+[x] docs/document_driven_development/reference/session_management.md
+[x] docs/document_driven_development/overview.md
 [x] README.md
-[x] .claude/commands/exit.md
+[x] Makefile
+[x] .claude/commands/extract-memories.md
 [x] .claude/commands/cleanup.md

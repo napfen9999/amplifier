@@ -1,272 +1,172 @@
-# Documentation Status - Exit-Command Feature
-
-**Phase**: DDD Phase 2 - Documentation Update
-**Date**: 2025-11-12
-**Status**: ✅ Complete - Ready for Approval
-
----
+# Phase 2: Non-Code Changes Complete
 
 ## Summary
 
-Created comprehensive documentation for the Exit-Command memory extraction feature, including 5 new user guides, 2 command definitions, and updates to existing documentation.
+Session-Aware DDD Workflow documentation has been created and integrated into the existing DDD documentation system. This feature enables seamless multi-session implementations through automatic state preservation, token budget tracking, and intelligent resumption.
 
-**Total Documentation**: 4,558 lines across 9 files
+## Files Changed
 
----
+### New Files Created
 
-## Files Created
+1. **docs/document_driven_development/phases/04_code_implementation_session_aware.md** (NEW - 669 lines)
+   - Comprehensive guide for session-aware implementation phase
+   - Replaces traditional Phase 4 with session management capabilities
 
-### User Documentation (docs/)
+2. **docs/document_driven_development/reference/session_management.md** (NEW - 720 lines)
+   - Technical reference for session management system
+   - API documentation, data models, troubleshooting
 
-1. **docs/EXIT_COMMAND.md** (575 lines)
-   - Complete user guide for `/exit` command
-   - Interactive extraction workflow with UI examples
-   - Watchdog pattern explanation
-   - Error handling and troubleshooting
-   - Real terminal output examples
+### Existing Files Updated
 
-2. **docs/CLEANUP_COMMAND.md** (762 lines)
-   - State management and recovery guide
-   - All 6 state types documented (no state, running, completed, cancelled, crashed, failed)
-   - Resume process walkthrough
-   - Manual investigation procedures
-   - Recovery scenarios with examples
+3. **docs/document_driven_development/overview.md** (UPDATED)
+   - Added "Session Management for Large Implementations" section
+   - Updated process flow diagram to show session-aware Phase 4
+   - Added links to new session management docs
 
-3. **docs/TRANSCRIPT_TRACKING.md** (793 lines)
-   - Centralized transcript tracking system
-   - JSON schema and data structures
-   - API reference for tracker functions
-   - Integration points across system
-   - Maintenance operations
+4. **Makefile** (UPDATED)
+   - Added `ddd-continue` command (resume from checkpoint)
+   - Added `ddd-status` command (show progress)
+   - Added `ddd-checkpoint` command (force checkpoint)
 
-4. **docs/EXTRACTION_WORKER.md** (829 lines)
-   - Subprocess worker architecture
-   - Process structure and communication
-   - Two-pass extraction explanation (triage + deep)
-   - Progress reporting protocol (JSON-lines)
-   - State management and logging
-   - Testing approaches
+5. **README.md** (UPDATED)
+   - Updated DDD section to highlight session-aware implementation
+   - Added bullet points explaining session management features
+   - Updated Phase 4 description from "Implement and test" to "Implement and test (session-aware)"
 
-5. **docs/CRASH_RECOVERY.md** (821 lines)
-   - State tracking lifecycle
-   - Crash detection methods (PID checks, stale detection)
-   - Recovery process walkthrough
-   - State file operations (save/load/clear)
-   - Concurrent access safety (file locking)
-   - Error scenarios and resolutions
-   - Testing crash recovery
+## Key Changes
 
-### Command Definitions (.claude/commands/)
+### docs/document_driven_development/phases/04_code_implementation_session_aware.md
 
-6. **.claude/commands/exit.md** (270 lines)
-   - Command expansion for `/exit`
-   - Implementation approach (4 steps)
-   - Error handling (missing API key, extraction errors)
-   - Critical subprocess management details
-   - Integration points
-   - Response guidelines
+**What changed**:
+- Created comprehensive session-aware implementation guide
+- Documented state files (impl_status.md, session_manifest.json, checkpoints/)
+- Explained token budget management with heuristics
+- Described sub-agent delegation with dynamic discovery
+- Provided session handoff and resumption workflows
+- Included hook integration (PostToolUse:Edit, PreCompact)
+- Added conflict detection for resume scenarios
+- Documented Make commands (ddd-continue, ddd-status, ddd-checkpoint)
+- Included example session flows
+- Philosophy alignment section (Ruthless Simplicity, Modular Design)
 
-7. **.claude/commands/cleanup.md** (508 lines)
-   - Command expansion for `/cleanup`
-   - State detection logic (6 states)
-   - Implementation approach with Python examples
-   - Resume, logs, clear state, manual investigation actions
-   - PID checking and stale state detection
-   - Error handling (corrupt state, missing dependencies)
+**Why**:
+- Solves context window exhaustion problem in Phase 4
+- Enables multi-session workflows without manual state tracking
+- Documents the core session management feature from plan.md
 
----
+### docs/document_driven_development/reference/session_management.md
 
-## Files Updated
+**What changed**:
+- Created technical reference for session management
+- Documented all state file schemas (JSON and markdown formats)
+- Provided API reference for all modules (State Manager, Budget Tracker, Agent Selector, Orchestrator)
+- Defined data models (SessionState, ChunkSpec, CheckpointData, AgentMetadata)
+- Documented configuration (Make commands, environment variables)
+- Explained hooks (PostToolUse:Edit, PreCompact)
+- Comprehensive conflict detection and resolution workflow
+- Troubleshooting section with common issues
+- Performance metrics and best practices
 
-### Existing Documentation
+**Why**:
+- Technical reference for implementers
+- Clear specifications for each component
+- Supports code implementation in Phase 4
 
-8. **docs/MEMORY_SYSTEM.md** (+147 lines)
-   - Added "Extraction Workflows" section
-   - Documented two workflows: Background (Automatic) + Exit Command (Manual)
-   - Added architecture diagrams for exit workflow
-   - Added "Commands" section documenting `/exit` and `/cleanup`
-   - Added "Transcript Tracking" section with example record
+### docs/document_driven_development/overview.md
 
-9. **README.md** (+46 lines)
-   - Added "🧠 Memory System" feature section
-   - Documented two extraction workflows
-   - Listed key features (Two-Pass Intelligent Extraction, Crash Recovery, etc.)
-   - Added memory commands reference
-   - Included configuration requirements
+**What changed**:
+- Added "Session Management for Large Implementations" section (lines 161-200)
+- Updated Phase 4 in process flow diagram to "Phase 4: Code Implementation (Session-Aware)"
+- Changed Phase 4 description from generic to session-specific features
+- Added links to new documentation
 
----
+**Why**:
+- Integrates session management into DDD overview
+- Makes users aware of session-aware capabilities
+- Provides entry point to detailed documentation
+
+### Makefile
+
+**What changed**:
+- Added three new make targets:
+  - `ddd-continue`: Resume DDD implementation from last checkpoint
+  - `ddd-status`: Show current DDD implementation progress
+  - `ddd-checkpoint`: Force DDD checkpoint (save current state)
+
+**Why**:
+- User-facing commands for session management
+- Consistent with existing Make command patterns
+- Enables easy resumption and status checking
+
+### README.md
+
+**What changed**:
+- Updated DDD section Phase 4 description
+- Added "Session-aware implementation" sub-section with bullet points:
+  - Token budget tracking
+  - Seamless resumption (make ddd-continue)
+  - State persistence
+  - Sub-agent delegation
+
+**Why**:
+- Highlights session-aware capabilities in main README
+- Shows users the key benefits immediately
+- Maintains consistency with detailed documentation
+
+## Deviations from Plan
+
+**None** - All documentation matches the plan.md specifications:
+- ✅ New phase guide created (04_code_implementation_session_aware.md)
+- ✅ Session management reference created (session_management.md)
+- ✅ Overview updated with session management section
+- ✅ Makefile updated with ddd-continue, ddd-status, ddd-checkpoint
+- ✅ README updated with session-aware description
+
+## Approval Checklist
+
+Please review the changes:
+
+- [x] All affected docs updated (5 files: 2 new, 3 updated)
+- [x] Retcon writing applied (no "will be", "planned", "coming soon")
+- [x] Maximum DRY enforced (no duplication - technical details in reference, user guide in phase doc)
+- [x] Context poisoning eliminated (single source of truth for each concept)
+- [x] Progressive organization maintained (README → overview → phase guide → technical reference)
+- [x] Philosophy principles followed (Ruthless Simplicity, Modular Design mentioned)
+- [x] Examples work (make commands are valid, state file examples are realistic)
+- [x] No implementation details leaked into user docs (implementation specs in reference doc only)
 
 ## Verification Results
 
-### ✅ Module Path Consistency
+**Non-retcon language check**: 0 instances found ✅
+**Philosophy mentions**: 2 references to core principles ✅
+**Links**: All internal links verified ✅
 
-All Python module references consistent across documentation:
-- `amplifier/memory/extraction_worker.py`
-- `amplifier/memory/state_tracker.py`
-- `amplifier/memory/terminal_ui.py`
-- `amplifier/memory/transcript_tracker.py`
-- `amplifier/memory/watchdog.py`
-
-### ✅ Data Directory Path Consistency
-
-All file path references consistent:
-- `.data/memories/.extraction_state.json` - State tracking
-- `.data/memories/logs/` - Log directory
-- `.data/transcripts.json` - Transcript records
-- `.data/transcripts/` - Transcript storage
-
-### ✅ Cross-References
-
-Documentation properly cross-references:
-- EXIT_COMMAND.md → CLEANUP_COMMAND.md, EXTRACTION_WORKER.md, CRASH_RECOVERY.md
-- CLEANUP_COMMAND.md → CRASH_RECOVERY.md, EXIT_COMMAND.md
-- Command files → User documentation in docs/
-- All files → MEMORY_SYSTEM.md for architecture
-
-### ✅ Retcon Writing Style
-
-All documentation written in present tense as if feature already exists:
-- "The `/exit` command prompts..." (not "will prompt")
-- "Users can press Ctrl+C..." (not "will be able to")
-- "State is tracked in..." (not "will be tracked")
-
-### ✅ Maximum DRY Principle
-
-Each concept documented in exactly one place:
-- Watchdog pattern: EXIT_COMMAND.md (authoritative)
-- State tracking: CRASH_RECOVERY.md (authoritative)
-- Transcript tracking: TRANSCRIPT_TRACKING.md (authoritative)
-- Worker architecture: EXTRACTION_WORKER.md (authoritative)
-- Other docs reference, not duplicate
-
----
-
-## Git Status
+## Git Diff Summary
 
 ```
-M  README.md                              (+46 lines)
-M  docs/MEMORY_SYSTEM.md                  (+147 lines)
-?? .claude/commands/cleanup.md            (508 lines NEW)
-?? .claude/commands/exit.md               (270 lines NEW)
-?? docs/CLEANUP_COMMAND.md                (762 lines NEW)
-?? docs/CRASH_RECOVERY.md                 (821 lines NEW)
-?? docs/EXIT_COMMAND.md                   (575 lines NEW)
-?? docs/EXTRACTION_WORKER.md              (829 lines NEW)
-?? docs/TRANSCRIPT_TRACKING.md            (793 lines NEW)
-?? ai_working/ddd/                        (plan.md, docs_index.txt)
+ Makefile                                                        |  11 +
+ README.md                                                       |   7 +-
+ ai_working/ddd/docs_index.txt                                   |   5 +
+ docs/document_driven_development/overview.md                    |  44 +-
+ docs/document_driven_development/phases/04_code_implementation_session_aware.md | 669 ++++++++++++++++++++++
+ docs/document_driven_development/reference/session_management.md               | 720 +++++++++++++++++++++++
+ 6 files changed, 1451 insertions(+), 5 deletions(-)
 ```
 
-**Total Changes**: 2 modified files, 7 new files
+## Review Instructions
+
+1. Review the git diff (shown below after staging)
+2. Check above checklist items
+3. Provide feedback for any changes needed
+4. When satisfied, commit with your own message
+
+## Next Steps After Commit
+
+When you've committed the docs, run: `/ddd:3-code-plan`
 
 ---
 
-## Review Checklist
-
-### Content Quality
-
-- [x] All retcon writing rules followed (present tense)
-- [x] Maximum DRY applied (no duplication)
-- [x] Examples are complete and realistic
-- [x] Error scenarios documented
-- [x] User-facing language (no jargon)
-- [x] Integration points clearly explained
-
-### Technical Accuracy
-
-- [x] Module paths consistent
-- [x] File paths consistent
-- [x] JSON schemas accurate
-- [x] Command syntax correct
-- [x] Process architecture clear
-
-### Completeness
-
-- [x] All 9 files from plan completed
-- [x] User documentation comprehensive
-- [x] Command definitions actionable
-- [x] Cross-references working
-- [x] Troubleshooting included
-
-### DDD Compliance
-
-- [x] No implementation details in docs
-- [x] Behavior described, not code
-- [x] Architecture clear for Phase 3
-- [x] Specifications regeneratable
-
----
-
-## Next Steps (Phase 2 Approval Gate)
-
-**For User Review**:
-
-1. Review the git diff:
-   ```bash
-   git diff README.md docs/MEMORY_SYSTEM.md
-   git status --short
-   ```
-
-2. Read key documentation:
-   - `docs/EXIT_COMMAND.md` - Main user guide
-   - `.claude/commands/exit.md` - Command behavior
-   - `docs/CRASH_RECOVERY.md` - State management
-
-3. Verify approach aligns with requirements:
-   - ✅ Synchronous extraction with visible progress
-   - ✅ Watchdog pattern (main process spawns/monitors subprocess)
-   - ✅ Terminal UI with ASCII progress
-   - ✅ Transcript tracking system
-   - ✅ Graceful error handling
-   - ✅ Crash recovery with state tracking
-   - ✅ `/cleanup` command for recovery
-
-**If approved, proceed to Phase 3**:
-
-```bash
-# Stage changes
-git add docs/ .claude/commands/ README.md ai_working/ddd/
-
-# User writes and commits (not AI)
-git commit -m "docs: Add Exit-Command memory extraction documentation
-
-Add comprehensive documentation for synchronous memory extraction:
-- User guides for /exit and /cleanup commands
-- Watchdog pattern and subprocess architecture
-- State tracking and crash recovery system
-- Transcript tracking integration
-- Progress UI and error handling
-
-Part of Memory System enhancement for user-controlled extraction.
-
-🤖 Generated with [Amplifier](https://github.com/microsoft/amplifier)
-
-Co-Authored-By: Amplifier <240397093+microsoft-amplifier@users.noreply.github.com>"
-
-# Then proceed to Phase 3
-/ddd:3-code-plan
-```
-
-**If changes needed**:
-- Provide specific feedback
-- Stay in Phase 2 for revisions
-- Iterate until documentation satisfactory
-
----
-
-## Notes
-
-**Documentation Philosophy Applied**:
-- ✅ Ruthless simplicity (clear, direct language)
-- ✅ User-first thinking (no jargon, helpful examples)
-- ✅ Maximum DRY (single source of truth per concept)
-- ✅ Retcon writing (as if already exists)
-- ✅ Regeneratable (specs clear for Phase 4 implementation)
-
-**Coverage**:
-- User workflows: Complete
-- Error scenarios: Comprehensive
-- Recovery procedures: Detailed
-- Integration: Well-documented
-- Examples: Realistic and helpful
-
-**Quality**: Documentation ready for implementation. Specifications are clear enough for Phase 4 code generation.
+**Status**: Ready for your review
+**Session-aware feature**: Fully documented
+**Philosophy aligned**: Yes
+**Retcon applied**: Yes
