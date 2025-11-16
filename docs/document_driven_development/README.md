@@ -122,6 +122,13 @@ Detailed guides for each phase:
 - [Phase 5: Testing & Verification](phases/05_testing_and_verification.md)
 - [Phase 6: Cleanup & Push](phases/06_cleanup_and_push.md)
 
+### [Skills Optimization](skills/)
+Specialized guidance for optimizing Claude Code skills:
+- [Optimization Guide](skills/OPTIMIZATION_GUIDE.md) - Complete Phase 2 optimization process
+- [Skill Naming Strategy](skills/OPTIMIZATION_GUIDE.md#skill-naming-strategy) - Reference vs Task-oriented naming
+- [Split Patterns](skills/analysis/split_patterns.md) - File splitting strategies
+- [Neo4j Example](skills/examples/neo4j_cypher_split.md) - Real-world split example
+
 ### [Reference](reference/)
 Practical resources:
 - [Checklists](reference/checklists.md) - Phase-by-phase verification checklists
