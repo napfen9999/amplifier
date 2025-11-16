@@ -56,6 +56,7 @@ def test_cleanup_extraction_completed(temp_data_dir):
 
     assert result["success"] is True
     assert result["stopped"] is False
+    assert isinstance(result["message"], str)
     assert "cleaned up" in result["message"]
 
 
@@ -75,6 +76,7 @@ def test_cleanup_extraction_running_without_force(temp_data_dir):
         result = cleanup_extraction(force=False)
 
     assert result["success"] is False
+    assert isinstance(result["message"], str)
     assert "running" in result["message"]
     assert result["stopped"] is False
 
@@ -106,6 +108,7 @@ def test_cleanup_extraction_running_with_force(temp_data_dir):
 
     assert result["success"] is True
     assert result["stopped"] is True
+    assert isinstance(result["message"], str)
     assert "stopped" in result["message"]
 
     # Verify stop was called
@@ -133,6 +136,7 @@ def test_cleanup_extraction_force_stop_fails(temp_data_dir):
             result = cleanup_extraction(force=True)
 
     assert result["success"] is False
+    assert isinstance(result["message"], str)
     assert "Failed to stop" in result["message"]
     assert result["stopped"] is False
 
@@ -157,6 +161,7 @@ def test_cleanup_extraction_stop_raises_error(temp_data_dir):
             result = cleanup_extraction(force=True)
 
     assert result["success"] is False
+    assert isinstance(result["message"], str)
     assert "Error stopping" in result["message"]
     assert result["stopped"] is False
 
@@ -166,7 +171,9 @@ def test_get_cleanup_recommendations_idle(temp_data_dir):
     rec = get_cleanup_recommendations()
 
     assert rec["should_cleanup"] is False
+    assert isinstance(rec["reason"], str)
     assert "No extraction state" in rec["reason"]
+    assert isinstance(rec["actions"], list)
     assert len(rec["actions"]) == 0
 
 
@@ -186,7 +193,9 @@ def test_get_cleanup_recommendations_running(temp_data_dir):
         rec = get_cleanup_recommendations()
 
     assert rec["should_cleanup"] is False
+    assert isinstance(rec["reason"], str)
     assert "running" in rec["reason"]
+    assert isinstance(rec["actions"], list)
     assert "Wait for extraction" in rec["actions"][0]
 
 
@@ -206,7 +215,9 @@ def test_get_cleanup_recommendations_completed(temp_data_dir):
         rec = get_cleanup_recommendations()
 
     assert rec["should_cleanup"] is True
+    assert isinstance(rec["reason"], str)
     assert "completed successfully" in rec["reason"]
+    assert isinstance(rec["actions"], list)
     assert "cleanup_extraction()" in rec["actions"][0]
 
 
@@ -226,7 +237,9 @@ def test_get_cleanup_recommendations_failed(temp_data_dir):
         rec = get_cleanup_recommendations()
 
     assert rec["should_cleanup"] is True
+    assert isinstance(rec["reason"], str)
     assert "with errors" in rec["reason"]
+    assert isinstance(rec["actions"], list)
     assert "Review logs" in rec["actions"][0]
 
 
@@ -246,7 +259,9 @@ def test_get_cleanup_recommendations_crashed(temp_data_dir):
         rec = get_cleanup_recommendations()
 
     assert rec["should_cleanup"] is True
+    assert isinstance(rec["reason"], str)
     assert "crashed" in rec["reason"]
+    assert isinstance(rec["actions"], list)
     assert "Review logs" in rec["actions"][0]
     assert "Investigate crash" in rec["actions"][2]
 
@@ -278,6 +293,7 @@ def test_cleanup_lifecycle(temp_data_dir):
     # Verify state gone
     rec = get_cleanup_recommendations()
     assert rec["should_cleanup"] is False
+    assert isinstance(rec["reason"], str)
     assert "No extraction state" in rec["reason"]
 
 

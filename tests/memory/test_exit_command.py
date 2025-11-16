@@ -46,6 +46,7 @@ def test_handle_exit_transcript_not_found(temp_data_dir):
     result = handle_exit("nonexistent", transcript_path)
 
     assert result["success"] is False
+    assert isinstance(result["message"], str)
     assert "not found" in result["message"]
     assert result["extraction_started"] is False
 
@@ -66,6 +67,7 @@ def test_handle_exit_first_session(temp_data_dir):
 
     assert result["success"] is True
     assert result["extraction_started"] is True
+    assert isinstance(result["message"], str)
     assert "started" in result["message"]
 
     # Verify transcript registered
@@ -98,6 +100,7 @@ def test_handle_exit_extraction_already_running(temp_data_dir):
 
     assert result["success"] is True
     assert result["extraction_started"] is False
+    assert isinstance(result["message"], str)
     assert "already in progress" in result["message"]
 
     # Verify transcript still registered
@@ -120,6 +123,7 @@ def test_handle_exit_start_extraction_fails(temp_data_dir):
         result = handle_exit("fail", transcript_path)
 
     assert result["success"] is False
+    assert isinstance(result["message"], str)
     assert "failed to start extraction" in result["message"]
     assert result["extraction_started"] is False
 
@@ -143,6 +147,7 @@ def test_handle_exit_register_transcript_fails(temp_data_dir):
         result = handle_exit("reg_fail", transcript_path)
 
     assert result["success"] is False
+    assert isinstance(result["message"], str)
     assert "Failed to register" in result["message"]
     assert result["extraction_started"] is False
 
@@ -154,6 +159,7 @@ def test_get_exit_command_status_idle(temp_data_dir):
     status = get_exit_command_status()
 
     assert status["status"] == "idle"
+    assert isinstance(status["message"], str)
     assert "No extraction" in status["message"]
     assert "transcripts_total" not in status
 
@@ -191,6 +197,7 @@ def test_get_exit_command_status_running(temp_data_dir):
         status = get_exit_command_status()
 
     assert status["status"] == "running"
+    assert isinstance(status["message"], str)
     assert "in progress" in status["message"]
     assert status["transcripts_total"] == 3
     assert status["transcripts_completed"] == 1
@@ -215,6 +222,7 @@ def test_get_exit_command_status_completed(temp_data_dir):
         status = get_exit_command_status()
 
     assert status["status"] == "completed"
+    assert isinstance(status["message"], str)
     assert "complete" in status["message"]
     assert status["transcripts_completed"] == 3
     assert status["memories_extracted"] == 15
@@ -238,6 +246,7 @@ def test_get_exit_command_status_failed(temp_data_dir):
         status = get_exit_command_status()
 
     assert status["status"] == "failed"
+    assert isinstance(status["message"], str)
     assert "failed" in status["message"]
     assert status["transcripts_completed"] == 2
     assert status["transcripts_total"] == 3
@@ -261,6 +270,7 @@ def test_get_exit_command_status_crashed(temp_data_dir):
         status = get_exit_command_status()
 
     assert status["status"] == "crashed"
+    assert isinstance(status["message"], str)
     assert "crashed" in status["message"]
     assert status["transcripts_completed"] == 1
 

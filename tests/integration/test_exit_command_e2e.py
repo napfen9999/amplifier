@@ -162,6 +162,7 @@ def test_e2e_extraction_worker_processes_transcripts(temp_transcripts_dir, sampl
 
         # Verify transcript marked as processed
         record = get_transcript_by_session(session_id)
+        assert record is not None
         assert record.processed is True
 
 

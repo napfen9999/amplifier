@@ -184,7 +184,7 @@ check: ## Format, lint, and type-check all code
 	@echo "Type-checking code with pyright..."
 	@VIRTUAL_ENV= uv run pyright
 	@echo "Checking for stubs and placeholders..."
-	@python tools/check_stubs.py
+	@python3 tools/check_stubs.py
 	@echo "All checks passed!"
 
 test: ## Run all tests

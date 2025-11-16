@@ -85,6 +85,7 @@ def test_process_transcript_handles_empty_file():
 
             assert result.success is True
             assert result.memories_extracted == 0
+            assert result.error is not None
             assert "No messages" in result.error
     finally:
         temp_path.unlink()
@@ -130,6 +131,7 @@ def test_process_transcript_handles_extraction_failure(temp_transcript):
 
         assert result.success is False
         assert result.memories_extracted == 0
+        assert result.error is not None
         assert "API error" in result.error
 
 
