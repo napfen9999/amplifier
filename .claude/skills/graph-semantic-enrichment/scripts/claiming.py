@@ -73,13 +73,29 @@ class PackageClaimer:
             """Transaction to atomically claim a package."""
 
             # Find first unclaimed MetaAttribute and claim it atomically
+            # CRITICAL: This uses a single atomic operation to prevent race conditions
+            # The WHERE clause in the SET ensures only truly unclaimed nodes are updated
             claim_query = """
             MATCH (m:MetaAttribute)
             WHERE m.enrichment_status = 'unclaimed'
-            WITH m LIMIT 1
-            SET m.enrichment_status = 'claimed',
-                m.claimed_at = datetime(),
-                m.claimed_by = $agent_id
+            WITH m
+            ORDER BY m.id  // Deterministic ordering to reduce contention
+            LIMIT 1
+            // Atomic check-and-set: only update if still unclaimed
+            SET m.enrichment_status = CASE
+                    WHEN m.enrichment_status = 'unclaimed' THEN 'claimed'
+                    ELSE m.enrichment_status
+                END,
+                m.claimed_at = CASE
+                    WHEN m.enrichment_status = 'unclaimed' THEN datetime()
+                    ELSE m.claimed_at
+                END,
+                m.claimed_by = CASE
+                    WHEN m.enrichment_status = 'unclaimed' THEN $agent_id
+                    ELSE m.claimed_by
+                END
+            WITH m
+            WHERE m.claimed_by = $agent_id  // Only return if we successfully claimed it
             RETURN m.id as meta_id,
                    m.attributeType as attribute_type,
                    m.claimed_at as claimed_at

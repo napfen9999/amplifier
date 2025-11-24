@@ -73,7 +73,7 @@ class TargetDB:
 
     def _execute_write_transaction(self, tx_func, **kwargs):
         """
-        Execute a write transaction on the TARGET database.
+        Execute a write transaction on the TARGET database with proper rollback.
 
         Args:
             tx_func: Transaction function to execute
@@ -83,14 +83,24 @@ class TargetDB:
             Transaction result
 
         Raises:
-            Neo4jError: If transaction fails
+            Neo4jError: If transaction fails (automatic rollback)
         """
+        session = None
         try:
-            with self.driver.session() as session:
-                return session.execute_write(tx_func, **kwargs)
+            session = self.driver.session()
+            # execute_write automatically handles commit/rollback
+            result = session.execute_write(tx_func, **kwargs)
+            logger.debug("Transaction committed successfully")
+            return result
         except Neo4jError as e:
-            logger.error(f"Write transaction failed: {e}")
+            logger.error(f"Write transaction failed (automatically rolled back): {e}")
             raise
+        except Exception as e:
+            logger.error(f"Unexpected error in transaction (automatically rolled back): {e}")
+            raise
+        finally:
+            if session:
+                session.close()
 
     def enrich_metaattribute(
         self,

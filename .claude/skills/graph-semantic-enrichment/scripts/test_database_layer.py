@@ -317,10 +317,10 @@ def test_model_compatibility():
         forMetaAttribute="M999",
         nameDe="Test",
         nameEn="Test",
-        whatItIsDe="A" * 50,  # Minimum 50 chars
-        whatItIsEn="B" * 50,
-        whatItIsNotDe="C" * 50,
-        whatItIsNotEn="D" * 50,
+        whatItIsDe=["A" * 20, "B" * 20],  # 2-5 items, each 10+ chars
+        whatItIsEn=["C" * 20, "D" * 20],
+        whatItIsNotDe=["E" * 20, "F" * 20],
+        whatItIsNotEn=["G" * 20, "H" * 20],
     )
 
     result = validate_enumeration(enum)

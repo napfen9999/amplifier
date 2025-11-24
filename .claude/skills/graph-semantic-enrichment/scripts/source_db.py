@@ -45,8 +45,8 @@ class SourceDB:
             max_connection_lifetime=3600,
             max_connection_pool_size=50,
             connection_acquisition_timeout=30,
-            # Note: readonly flag at driver level for additional safety
-            # Some Neo4j versions may not support this, so we also enforce at method level
+            # Additional safety: default_access_mode ensures all sessions are READ by default
+            default_access_mode="READ",
         )
 
         logger.info(f"Connected to SOURCE database (READ-ONLY): {self.uri}")

@@ -138,7 +138,7 @@ def validate_metaattribute(meta_attr: MetaAttributeV3) -> ValidationResult:
                 tier2_violations.append(f"whatItIsEn item too generic: '{item}'")
 
     # Check for "TBD" or "N/A" values
-    for field_name, field_value in meta_attr.dict().items():
+    for field_name, field_value in meta_attr.model_dump().items():
         if isinstance(field_value, str) and field_value in ["TBD", "N/A", "TODO"]:
             tier2_violations.append(f"{field_name} contains placeholder value: {field_value}")
 
@@ -239,7 +239,7 @@ def validate_enumeration(enumeration: EnumerationV3) -> ValidationResult:
                 tier2_violations.append(f"whatItIsEn contains generic term: '{item}'")
 
     # Check for placeholder values
-    for field_name, field_value in enumeration.dict().items():
+    for field_name, field_value in enumeration.model_dump().items():
         if isinstance(field_value, str) and field_value in ["TBD", "N/A", "TODO"]:
             tier2_violations.append(f"{field_name} contains placeholder value: {field_value}")
 

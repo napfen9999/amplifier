@@ -148,11 +148,11 @@ class EnumerationV3(BaseModel):
     nameDe: str = Field(..., min_length=3, max_length=100)
     nameEn: str = Field(..., min_length=3, max_length=100)
 
-    whatItIsDe: str = Field(..., min_length=50, max_length=300)
-    whatItIsEn: str = Field(..., min_length=50, max_length=300)
+    whatItIsDe: list[str] = Field(..., min_length=2, max_length=5, description="2-5 items defining what it is")
+    whatItIsEn: list[str] = Field(..., min_length=2, max_length=5, description="2-5 items defining what it is")
 
-    whatItIsNotDe: str = Field(..., min_length=50, max_length=300)
-    whatItIsNotEn: str = Field(..., min_length=50, max_length=300)
+    whatItIsNotDe: list[str] = Field(..., min_length=2, max_length=5, description="2-5 items defining what it is NOT")
+    whatItIsNotEn: list[str] = Field(..., min_length=2, max_length=5, description="2-5 items defining what it is NOT")
 
     examplesDe: str | None = Field(None, min_length=100, max_length=400)
     examplesEn: str | None = Field(None, min_length=100, max_length=400)
@@ -163,10 +163,18 @@ class EnumerationV3(BaseModel):
 
     @field_validator("whatItIsDe", "whatItIsEn", "whatItIsNotDe", "whatItIsNotEn")
     @classmethod
-    def validate_semantic_content(cls, v: str) -> str:
+    def validate_semantic_content(cls, v: list[str]) -> list[str]:
         """Ensure semantic content is substantial."""
-        if v.strip().upper() in ["TBD", "N/A", "TODO", "NA"]:
-            raise ValueError(f"Placeholder content not allowed: {v}")
+        if not v:
+            raise ValueError("List cannot be empty")
+
+        for item in v:
+            if not isinstance(item, str):
+                raise ValueError(f"All items must be strings, got {type(item)}")
+            if len(item.strip()) < 10:
+                raise ValueError(f"Each item must be at least 10 characters: {item}")
+            if item.strip().upper() in ["TBD", "N/A", "TODO", "NA"]:
+                raise ValueError(f"Placeholder content not allowed: {item}")
         return v
 
 
