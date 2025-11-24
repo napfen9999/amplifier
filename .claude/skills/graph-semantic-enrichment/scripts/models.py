@@ -29,11 +29,11 @@ class EnrichmentStatus(str, Enum):
 
 
 class AttributeType(str, Enum):
-    """Type of attribute content."""
+    """Type of attribute content (V3 specification)."""
 
-    ENUMERATION = "enumeration"
-    FREE_TEXT = "free_text"
-    MIXED = "mixed"
+    ENUMERATION = "ENUMERATION"
+    FREITEXT = "FREITEXT"
+    HYBRID = "HYBRID"
 
 
 # Base Models
@@ -80,7 +80,9 @@ class MetaAttributeV3(EnrichableNode):
     brandingRelevanceDe: str | None = Field(None, min_length=100, max_length=400)
     brandingRelevanceEn: str | None = Field(None, min_length=100, max_length=400)
 
-    scope: str = Field(..., pattern="^(primary_scope|secondary_scope)$")
+    # V3 Architecture: NO 'scope' or 'layer' properties on node!
+    # - scope: Derived via m ← [:HAS_ATTRIBUTE] ← Layer ← [:HAS_LAYER] ← MetaScope
+    # - layer: Derived via m ← [:HAS_ATTRIBUTE] ← Layer
     attributeType: AttributeType = Field(...)
 
     # Visualization properties
