@@ -1,5 +1,0 @@
-[x] docs/document_driven_development/phases/04_code_implementation_session_aware.md
-[x] docs/document_driven_development/reference/session_management.md
-[x] docs/document_driven_development/overview.md
-[x] Makefile
-[x] README.md
