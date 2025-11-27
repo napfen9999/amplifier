@@ -16,6 +16,7 @@ This file is reserved for Claude Code-specific instructions.
 - @ai_context/DESIGN-PRINCIPLES.md
 - @ai_context/design/DESIGN-FRAMEWORK.md
 - @ai_context/design/DESIGN-VISION.md
+- @ai_context/flow/FLOW_DRIVEN_DEVELOPMENT.md
 
 # Claude's Working Philosophy and Memory System
 
