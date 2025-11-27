@@ -13,8 +13,7 @@
       ".data",
       ".vscode",
       ".claude",
-      ".ai",
-      "~/amplifier"
+      ".ai"
     ]
   },
   "enableAllProjectMcpServers": false,
