@@ -370,7 +370,6 @@ python -m scripts.lean_db edges write-coupling-v1 --meta-a M001 --meta-b M002 --
 ```
 
 **BEACHTE**:
-- **Umlaute ersetzen**: ä→ae, ö→oe, ü→ue, ß→ss (für JSON-Sicherheit)
 - KEINE Zeilenumbrüche im JSON
 - JSON in einfachen Anführungszeichen ('...')
 - Alles in EINER Zeile
@@ -415,7 +414,6 @@ C = 0.20×C1 + 0.20×C2 + 0.20×C3 + 0.20×C4 + 0.20×C5
 4. **KONTRASTBEGRÜNDUNG PFLICHT**: Jedes Reasoning MUSS "X statt Y weil..." enthalten
 5. **MAX 25 PAARE**: Pro Batch maximal 25 Paare
 6. **PARALLEL SCHREIBEN**: Alle Writes in EINER Nachricht
-7. **UMLAUTE ERSETZEN**: ä→ae, ö→oe, ü→ue, ß→ss im JSON
 
 ---
 
