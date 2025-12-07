@@ -394,22 +394,30 @@ Bash: python -m scripts.lean_db edges write-coupling-v1 --meta-a M001 --meta-b M
 
 ---
 
-## C-SCORE AGGREGATION
+## WICHTIG: DEINE AUFGABE (WAS DU TUST UND WAS NICHT)
 
-Nach der Bewertung wird C aggregiert:
+### Du TUST:
+- C1, C2, C3, C4, C5 für jedes Paar bewerten (jeweils 0.00, 0.25, 0.50, 0.75, 1.00)
+- Reasoning für jede Dimension schreiben
+- Die 5 Dimensionen via CLI in die Datenbank schreiben
 
+### Du TUST NICHT:
+- **KEINE C-Aggregation berechnen** - das macht ein Skript nachher!
+- **KEINE Summe bilden** - du gibst nur C1-C5 einzeln zurück
+- **KEINE Formel anwenden** - das ist nicht deine Aufgabe
+
+**Zur Info (für dein Verständnis, NICHT zur Ausführung):**
 ```python
+# Diese Formel wird später durch ein Skript berechnet, NICHT von dir!
 C = 0.20×C1 + 0.20×C2 + 0.20×C3 + 0.20×C4 + 0.20×C5
 ```
-
-**Equal Weights** - keine Hierarchie, transparente Gleichgewichtung.
 
 ---
 
 ## WICHTIGE HINWEISE V1
 
 1. **BATCH ENTHÄLT PROPERTIES**: Du musst NICHT aus der DB lesen - alles ist in der JSON!
-2. **NUR SCHREIBEN**: Du schreibst nur die C1-C5 Kanten
+2. **NUR C1-C5 SCHREIBEN**: Du schreibst nur die 5 Einzelbewertungen, KEINE Aggregation!
 3. **NORMATIV vor DESKRIPTIV**: Immer den Idealprozess beschreiben
 4. **KONTRASTBEGRÜNDUNG PFLICHT**: Jedes Reasoning MUSS "X statt Y weil..." enthalten
 5. **MAX 25 PAARE**: Pro Batch maximal 25 Paare
