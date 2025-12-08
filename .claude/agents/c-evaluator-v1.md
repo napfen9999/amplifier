@@ -97,38 +97,47 @@ Die Batch-Datei hat folgendes Format:
 
 ```json
 {
-  "batch_id": "C_001",
-  "agent_id": "C_V1_A1",
-  "pairs": [
-    {
-      "meta_a": {
-        "id": "M001",
-        "nameDe": "Kernzweck",
-        "definitionDe": "Der fundamentale Existenzgrund...",
-        "whatItIsDe": "...",
-        "whatItIsNotDe": "...",
-        "brandingRelevanceDe": "..."
-      },
-      "meta_b": {
-        "id": "M002",
-        "nameDe": "Vision",
-        "definitionDe": "Der angestrebte Zukunftszustand...",
-        "whatItIsDe": "...",
-        "whatItIsNotDe": "...",
-        "brandingRelevanceDe": "..."
-      }
+  "batch_id": 1,
+  "meta_attributes": {
+    "M001": {
+      "id": "M001",
+      "nameDe": "Kernzweck",
+      "definitionDe": "Der fundamentale Existenzgrund...",
+      "whatItIsDe": ["..."],
+      "whatItIsNotDe": ["..."],
+      "brandingRelevanceDe": "..."
+    },
+    "M002": {
+      "id": "M002",
+      "nameDe": "Vision",
+      "definitionDe": "...",
+      "whatItIsDe": ["..."],
+      "whatItIsNotDe": ["..."],
+      "brandingRelevanceDe": "..."
     }
-    // ... weitere Paare (max 25)
-  ]
+  },
+  "pairs": [
+    {"meta_a": "M001", "meta_b": "M002"},
+    {"meta_a": "M001", "meta_b": "M003"}
+  ],
+  "pair_count": 25,
+  "cli_commands": {
+    "write": "python -m scripts.lean_db edges write-coupling-v1 --meta-a {meta_a} --meta-b {meta_b} --data '{json}'"
+  }
 }
 ```
+
+**WICHTIG: Properties nachschlagen!**
+- `pairs[i].meta_a` und `pairs[i].meta_b` sind nur IDs (z.B. "M001")
+- Die Properties findest du in `meta_attributes["M001"]` etc.
+- Du weißt bereits was C1-C5 bedeuten (siehe COUPLING-FRAGEN unten)
 
 ### Schritt 2: Alle Paare NORMATIV bewerten
 
 **KEINE Tool-Aufrufe während der Bewertung!**
 
 Für JEDES Paar:
-1. Lies die MetaAttribute-Properties aus der Batch-Datei
+1. Schlage die MetaAttribute-Properties in `meta_attributes` nach (via ID)
 2. **STRIKT anwenden** - Lies und verinnerliche diese Sektionen:
    - **BEWERTUNGSSKALA**: Was bedeutet 0.00, 0.25, 0.50, 0.75, 1.00?
    - **COUPLING-FRAGEN (C1-C5)**: Was misst jede Frage? Studiere die Beispiele.
@@ -417,11 +426,12 @@ C = 0.20×C1 + 0.20×C2 + 0.20×C3 + 0.20×C4 + 0.20×C5
 ## WICHTIGE HINWEISE V1
 
 1. **BATCH ENTHÄLT PROPERTIES**: Du musst NICHT aus der DB lesen - alles ist in der JSON!
-2. **NUR C1-C5 SCHREIBEN**: Du schreibst nur die 5 Einzelbewertungen, KEINE Aggregation!
-3. **NORMATIV vor DESKRIPTIV**: Immer den Idealprozess beschreiben
-4. **KONTRASTBEGRÜNDUNG PFLICHT**: Jedes Reasoning MUSS "X statt Y weil..." enthalten
-5. **MAX 25 PAARE**: Pro Batch maximal 25 Paare
-6. **PARALLEL SCHREIBEN**: Alle Writes in EINER Nachricht
+2. **PROPERTIES NACHSCHLAGEN**: `pairs[i].meta_a` ist nur ID → Properties in `meta_attributes["M001"]` nachschlagen!
+3. **NUR C1-C5 SCHREIBEN**: Du schreibst nur die 5 Einzelbewertungen, KEINE Aggregation!
+4. **NORMATIV vor DESKRIPTIV**: Immer den Idealprozess beschreiben
+5. **KONTRASTBEGRÜNDUNG PFLICHT**: Jedes Reasoning MUSS "X statt Y weil..." enthalten
+6. **MAX 25 PAARE**: Pro Batch maximal 25 Paare
+7. **PARALLEL SCHREIBEN**: Alle Writes in EINER Nachricht
 
 ---
 
