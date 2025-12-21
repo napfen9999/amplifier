@@ -4,27 +4,47 @@
 **/certs/mkcert
 .env
 *.local
+*.local.*
 *.user
 *__local__*
 appsettings.*.json
-**/.DS_Store
-.claude/settings.local.json
 
-# Dependencies and build cache
+# OS files
+**/.DS_Store
+**/Thumbs.db
+**/*Zone.Identifier
+**/*:Zone.Identifier
+**/*sec.endpointdlp
+**/*:sec.endpointdlp
+
+# Dependencies, build, test, and other generated files
 node_modules
 .venv
+venv
+env
 __pycache__
-.pytest_cache
-.ruff_cache
+*.py[cod]
+*$py.class
+*.so
+.Python
 .cache
+*.egg
 *.egg-info
-bin
-obj
-dist
-build
+.pytest_cache
+.coverage
+htmlcov/
+.tox/
+.ruff_cache
+bin/
+obj/
+dist/
+build/
+output/
 
 # Logs
+logs/
 *.log
+*.log.jsonl
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -36,34 +56,15 @@ lerna-debug.log*
 azure.yaml
 next-steps.md
 
-# Generated files
-output
-logs
-
-# Test files
-.coverage
-
-# Working folders
-ai_working/tmp
-.tmp
-
-# Ignore Windows Alternate Data Streams (ADS) files that may appear in WSL
-**/*Zone.Identifier
-**/*:Zone.Identifier
-**/*sec.endpointdlp
-**/*:sec.endpointdlp
-
 # Databases
 *.db
 *.sqlite
 *.sqlite3
 
-# Default data directory
-.data/
+##############################
+# Amplifier specific ignores #
+##############################
 
-# .claude-trace Logs
-.claude-trace
 
-# Smoke test runtime logs
-.smoke_test_data/data
-*.log.jsonl
+# Working folders
+ai_working/tmp
