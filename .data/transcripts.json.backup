@@ -1,0 +1,61 @@
+{
+  "version": "1.0",
+  "transcripts": [
+    {
+      "session_id": "e2e_test",
+      "transcript_path": "/tmp/tmp1r9e56yy/session_e2e_test.jsonl",
+      "created_at": "2025-11-12T16:58:39.448700",
+      "processed": true,
+      "processed_at": "2025-11-12T16:58:41.429157",
+      "memories_extracted": 2
+    },
+    {
+      "session_id": "e2e_multi1",
+      "transcript_path": "/tmp/tmpa2ngwgi8/session_e2e_multi1.jsonl",
+      "created_at": "2025-11-12T16:58:39.461595",
+      "processed": true,
+      "processed_at": "2025-11-12T16:58:43.314733",
+      "memories_extracted": 2
+    },
+    {
+      "session_id": "e2e_multi2",
+      "transcript_path": "/tmp/tmpa2ngwgi8/session_e2e_multi2.jsonl",
+      "created_at": "2025-11-12T16:58:39.464255",
+      "processed": true,
+      "processed_at": "2025-11-12T16:58:45.226686",
+      "memories_extracted": 2
+    },
+    {
+      "session_id": "e2e_multi3",
+      "transcript_path": "/tmp/tmpa2ngwgi8/session_e2e_multi3.jsonl",
+      "created_at": "2025-11-12T16:58:39.468017",
+      "processed": true,
+      "processed_at": "2025-11-12T16:58:44.363113",
+      "memories_extracted": 2
+    },
+    {
+      "session_id": "e2e_err1",
+      "transcript_path": "/tmp/tmppam7en2g/session_e2e_err1.jsonl",
+      "created_at": "2025-11-12T16:58:44.373705",
+      "processed": true,
+      "processed_at": "2025-11-12T16:58:46.222603",
+      "memories_extracted": 1
+    },
+    {
+      "session_id": "e2e_err2",
+      "transcript_path": "/tmp/tmppam7en2g/session_e2e_err2.jsonl",
+      "created_at": "2025-11-12T16:58:44.375527",
+      "processed": true,
+      "processed_at": "2025-11-12T16:58:48.075935",
+      "memories_extracted": 0
+    },
+    {
+      "session_id": "e2e_err3",
+      "transcript_path": "/tmp/tmppam7en2g/session_e2e_err3.jsonl",
+      "created_at": "2025-11-12T16:58:44.377587",
+      "processed": false,
+      "processed_at": null,
+      "memories_extracted": 0
+    }
+  ]
+}

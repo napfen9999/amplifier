@@ -1,0 +1,93 @@
+{
+  "memories": [
+    {
+      "content": "API key loading fails in submodule environment due to .env file scope limitation",
+      "category": "issue_solved",
+      "metadata": {
+        "importance": 0.8,
+        "tags": [
+          "configuration",
+          "submodule",
+          "environment"
+        ],
+        "extraction_method": "claude_sdk"
+      },
+      "id": "ef73c88e-639d-44a1-9843-661247c527e4",
+      "timestamp": "2025-11-12T11:55:52.794746",
+      "accessed_count": 0
+    },
+    {
+      "content": "Outdated model version detected: claude-haiku-4-5-20251015 is no longer valid",
+      "category": "issue_solved",
+      "metadata": {
+        "importance": 0.7,
+        "tags": [
+          "model",
+          "versioning",
+          "ai"
+        ],
+        "extraction_method": "claude_sdk"
+      },
+      "id": "0cb6ccf2-f9c5-4c7c-ae89-ebb8aa6d5eac",
+      "timestamp": "2025-11-12T11:55:52.800120",
+      "accessed_count": 0
+    },
+    {
+      "content": "Dev Containers and Claude Code Web solve similar problems of consistent development environments, but at different scales - local vs cloud",
+      "category": "learning",
+      "metadata": {
+        "importance": 0.8,
+        "tags": [
+          "development_environment",
+          "cloud_computing",
+          "consistency"
+        ],
+        "extraction_method": "claude_sdk"
+      },
+      "id": "9dcb6e72-5633-43a6-bc7b-c1a76fa6de01",
+      "timestamp": "2025-11-12T11:56:17.473566",
+      "accessed_count": 0
+    },
+    {
+      "content": "Containerization helps solve 'it works on my machine' problem by providing identical development environments",
+      "category": "pattern",
+      "metadata": {
+        "importance": 0.9,
+        "tags": [
+          "docker",
+          "devops",
+          "standardization"
+        ],
+        "extraction_method": "claude_sdk"
+      },
+      "id": "39fbc326-3ae8-47de-b5ab-30d445747198",
+      "timestamp": "2025-11-12T11:56:17.474623",
+      "accessed_count": 0
+    }
+  ],
+  "metadata": {
+    "version": "2.0",
+    "created": "2025-11-10T12:32:05.769018",
+    "last_updated": "2025-11-12T11:56:17.477847",
+    "count": 4
+  },
+  "key_learnings": [
+    "Submodule environments require explicit configuration for API key loading",
+    "AI model versions need regular updates and verification",
+    "Dev Containers isolate development environments",
+    "Cloud-based tools like Claude Code Web provide remote consistent environments",
+    "Containerization is a solution to environment inconsistency"
+  ],
+  "decisions_made": [
+    "Need to update model configuration",
+    "Must implement cross-submodule environment variable management",
+    "Use containerization for consistent development setups",
+    "Consider cloud-based development tools for remote collaboration"
+  ],
+  "issues_solved": [
+    "Identified API key loading limitation",
+    "Detected outdated model version",
+    "Environment inconsistency across different developer machines",
+    "Difficulty in setting up complex development environments"
+  ]
+}
