@@ -1,435 +1,466 @@
-# Amplifier: Metacognitive AI Development
+# Amplifier
 
-> _"Automate complex workflows by describing how you think through them."_
+**AI-powered modular development assistant - currently in early preview.**
 
 > [!CAUTION]
-> This project is a research demonstrator. It is in early development and may change significantly. Using permissive AI tools in your repository requires careful attention to security considerations and careful human supervision, and even then things can still go wrong. Use it with caution, and at your own risk. See [Disclaimer](#disclaimer).
+> This project is a research demonstrator. It is in early development and may change significantly. Using permissive AI tools on your computer requires careful attention to security considerations and careful human supervision, and even then things can still go wrong. Use it with caution, and at your own risk, we have NOT built in the safety systems yet. We are performing our _active exploration_ in the open for others to join in the conversation and exploration, not as a product or "official release".
 
-Amplifier is a coordinated and accelerated development system that turns your expertise into reusable AI tools without requiring code. Describe the step-by-step thinking process for handling a task—a "metacognitive recipe"—and Amplifier builds a tool that executes it reliably. As you create more tools, they combine and build on each other, transforming individual solutions into a compounding automation system.
+> [!NOTE]
+> **Looking for the earlier Claude Code-based version?** The previous version of Amplifier, built on top of Claude Code, has been moved to the [`amplifier-claude`](https://github.com/microsoft/amplifier/tree/amplifier-claude) branch.
 
-## 🚀 QuickStart
+---
 
-### Prerequisites Guide
+## What is Amplifier?
+
+Amplifier brings AI assistance to your command line with a modular, extensible architecture.
+
+**This CLI is _just one_ interface**—the reference implementation. The real power is the modular platform underneath. Soon you'll see web interfaces, mobile apps, voice-driven coding, and even Amplifier-to-Amplifier collaborative experiences. The community will build custom interfaces, mixing and matching modules dynamically to craft tailored AI experiences.
+
+---
+
+## Quick Start - Zero to Working in 90 Seconds
+
+> [!IMPORTANT]
+> Amplifier is currently developed and tested on macOS, Linux, and Windows Subsystem for Linux (WSL). Native Windows shells have known issues—use WSL unless you're actively contributing Windows fixes.
+
+### Step 1: Install UV (30 seconds)
+
+```bash
+# macOS/Linux/WSL
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Windows PowerShell
+powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+### Step 2: Install Amplifier (30 seconds)
+
+```bash
+uv tool install git+https://github.com/microsoft/amplifier
+```
+
+### Step 3: Run Amplifier (30 seconds)
+
+```bash
+# First-time wizard (auto-detects missing config)
+amplifier init
+
+# Ask a question
+amplifier run "Explain async/await in Python"
+
+# Start chat mode
+amplifier
+```
+
+### Step 4: Add bundles (optional)
+
+```bash
+# Add additional capability bundles
+amplifier bundle add git+https://github.com/microsoft/amplifier-bundle-recipes@main
+amplifier bundle add git+https://github.com/microsoft/amplifier-bundle-design-intelligence@main
+
+# Use a bundle
+amplifier bundle use recipes
+```
+
+Bundles ship focused agents you can invoke by name. Use `/agents` in chat to see available agents like `recipes:recipe-author` or `design-intelligence:component-designer`.
+
+**First time? Quick setup wizard:**
 
 <details>
-<summary>Click to expand prerequisite instructions</summary>
+<summary><b>With Anthropic Claude (recommended)</b></summary>
 
-1. Check if prerequisites are already met.
+```
+Provider? [1] Anthropic [2] OpenAI [3] Azure OpenAI [4] Ollama: 1
 
-   - ```bash
-     python3 --version  # Need 3.11+
-     ```
-   - ```bash
-     uv --version       # Need any version
-     ```
-   - ```bash
-     node --version     # Need any version
-     ```
-   - ```bash
-     pnpm --version     # Need any version
-     ```
-   - ```bash
-     git --version      # Need any version
-     ```
+API key: ••••••••
+  Get one: https://console.anthropic.com/settings/keys
+✓ Saved
 
-2. Install what is missing.
+Model? [1] claude-sonnet-4-5 [2] claude-opus-4-5 [3] custom: 1
+✓ Using claude-sonnet-4-5
 
-   **Mac**
+Ready! Starting chat...
 
-   ```bash
-   brew install python3 node git pnpm uv
-   ```
-
-   **Ubuntu/Debian/WSL**
-
-   ```bash
-   # System packages
-   sudo apt update && sudo apt install -y python3 python3-pip nodejs npm git
-
-   # pnpm
-   npm install -g pnpm
-   pnpm setup && source ~/.bashrc
-
-   # uv (Python package manager)
-   curl -LsSf https://astral.sh/uv/install.sh | sh
-   ```
-
-   **Windows**
-
-   1. Install [WSL2](https://learn.microsoft.com/windows/wsl/install)
-   2. Run Ubuntu commands above inside WSL
-
-   **Manual Downloads**
-
-   - [Python](https://python.org/downloads) (3.11 or newer)
-   - [Node.js](https://nodejs.org) (any recent version)
-   - [pnpm](https://pnpm.io/installation) (package manager)
-   - [Git](https://git-scm.com) (any version)
-   - [uv](https://docs.astral.sh/uv/getting-started/installation/) (Python package manager)
-
-> **Platform Note**: Development and testing has primarily been done in Windows WSL2. macOS and Linux should work but have received less testing. Your mileage may vary.
+Ready! Starting chat...
+>
+```
 
 </details>
 
-### Setup
-
-```bash
-# Clone Amplifier repository
-git clone https://github.com/microsoft/amplifier.git amplifier
-cd amplifier
-
-# Install dependencies
-make install
-
-# Activate virtual environment
-source .venv/bin/activate  # Linux/Mac/WSL
-# .venv\Scripts\Activate.ps1  # Windows PowerShell
-```
-
-### Get Started
-
-```bash
-# Start Claude Code
-claude
-```
-
-**Create your first tool in 5 steps:**
-
-1. **Identify a task** you want to automate (e.g., "weekly learning digest")
-
-   Need ideas? Try This:
-
-   ```
-   /ultrathink-task I'm new to "metacognitive recipes". What are some useful
-   tools I could create with Amplifier that show how recipes can self-evaluate
-   and improve via feedback loops? Just brainstorm ideas, don't build them yet.
-   ```
-
-2. **Describe the thinking process** - How would an expert handle it step-by-step?
-
-   Need help? Try This:
-
-   ```
-   /ultrathink-task This is my idea: <your idea here>. Can you help me describe the
-   thinking process to handle it step-by-step?
-   ```
-
-   Example of a metacognitive recipe:
-
-   ```markdown
-   I want to create a tool called "Research Synthesizer". Goal: help me research a topic by finding sources, extracting key themes, then asking me to choose which themes to explore in depth, and finally producing a summarized report.
-
-   Steps:
-
-   1. Do a preliminary web research on the topic and collect notes.
-   2. Extract the broad themes from the notes.
-   3. Present me the list of themes and highlight the top 2-3 you recommend focusing on (with reasons).
-   4. Allow me to refine or add to that theme list.
-   5. Do in-depth research on the refined list of themes.
-   6. Draft a report based on the deep research, ensuring the report stays within my requested length and style.
-   7. Offer the draft for my review and incorporate any feedback.
-   ```
-
-3. **Generate with `/ultrathink-task`** - Let Amplifier build the tool
-
-   ```
-   /ultrathink-task <your metacognitive recipe here>
-   ```
-
-4. **Refine through feedback** - "Make connections more insightful"
-
-   ```
-   Let's see how it works. Run <your generated tool>.
-   ```
-
-   Then:
-
-   - Observe and note issues.
-   - Provide feedback in context.
-   - Iterate until satisfied.
-
-**Learn more** with [Create Your Own Tools](docs/CREATE_YOUR_OWN_TOOLS.md) - Deep dive into the process.
-
----
-
-## 📖 How to Use Amplifier
-
-### Setup Your Project
-
-```bash
-# Clone Amplifier repository
-git clone https://github.com/microsoft/amplifier.git amplifier
-```
-
-1. For existing GitHub projects
-
-   ```bash
-   # Add your project as a submodule
-   cd amplifier
-   git submodule add https://github.com/<your-username>/<your-project-name>.git my-project
-   ```
-
-2. For new projects
-
-   ```bash
-   # Create a new GitHub repository
-
-   # Option 1: gh CLI
-   gh repo create <your-username>/<your-project-name> --private
-
-   # Option 2: Go to https://github.com/new
-   ```
-
-   ```bash
-   # Initialize your new project
-   git init my-project
-   cd my-project/
-   git remote add origin https://github.com/<your-username>/<your-project-name>.git
-   echo "# My Project" > README.md
-   git add .
-   git commit -m "Initial commit"
-   git push -u origin main
-
-   # 2. Add as submodule
-   cd ../amplifier
-   git submodule add https://github.com/<your-username>/<your-project-name>.git my-project
-   ```
-
-```bash
-# Install dependencies
-make install
-
-# Activate virtual environment
-source .venv/bin/activate  # Linux/Mac/WSL
-# .venv\Scripts\Activate.ps1  # Windows PowerShell
-
-# Set up project context & start Claude
-echo "# Project-specific AI guidance" > my-project/AGENTS.md
-claude
-```
-
-_Tell Claude Code:_
+<details>
+<summary><b>With Azure OpenAI (enterprise)</b></summary>
 
 ```
-I'm working on @my-project/ with Amplifier.
-Read @my-project/AGENTS.md for project context.
-Let's use /ddd:1-plan to design the architecture.
-```
+Provider? [1] Anthropic [2] OpenAI [3] Azure OpenAI [4] Ollama: 3
 
-> [!NOTE]
+Azure endpoint: https://my-resource.openai.azure.com/
+✓ Saved
+
+Authentication? [1] API key [2] Azure CLI (az login): 2
+✓ Using DefaultAzureCredential
+  (Works with 'az login' locally or managed identity in Azure)
+
+Deployment name: gpt-5.2
+  Note: Use your Azure deployment name, not model name
+✓ Configured
+
+Ready! Starting chat...
 >
-> **Why use this?** Clean git history per component, independent Amplifier updates, persistent context across sessions, scalable to multiple projects. See [Workspace Pattern for Serious Projects](#workspace-pattern-for-serious-projects) below for full details.
+```
+
+</details>
+
+<details>
+<summary><b>With OpenAI</b></summary>
+
+```
+Provider? [1] Anthropic [2] OpenAI [3] Azure OpenAI [4] Ollama: 2
+
+API key: ••••••••
+  Get one: https://platform.openai.com/api-keys
+✓ Saved
+
+Model? [1] gpt-5.2 [2] gpt-5.1-codex [3] gpt-5.2-pro [4] custom: 1
+✓ Using gpt-5.2
+
+Ready! Starting chat...
+>
+```
+
+</details>
+
+<details>
+<summary><b>With Ollama (local, free)</b></summary>
+
+```
+Provider? [1] Anthropic [2] OpenAI [3] Azure OpenAI [4] Ollama: 4
+
+Model? [1] llama3 [2] codellama [3] mistral [4] custom: 1
+✓ Using llama3
+
+Make sure Ollama is running:
+  ollama serve
+  ollama pull llama3
+
+Ready! Starting chat...
+>
+```
+
+</details>
+
+**That's it!** From nothing to productive AI assistant in 90 seconds.
+
+## What Can Amplifier Do?
+
+First of all, this is still VERY early and we have not brought _most_ of our features over yet, so keep your expectations low and we'll get it ramped up very quickly over the next week or two. Consider this just an early sneak peek.
+
+- **Generate code** - From simple functions to full applications
+- **Debug problems** - Systematic error resolution with the bug-hunter agent
+- **Design systems** - Architecture planning with the zen-architect agent
+- **Research solutions** - Find patterns and best practices with the researcher agent
+- **Build modules** - Use Amplifier to create new Amplifier modules (yes, really!)
+
+**Key features:**
+
+- **Modular**: Swap AI providers, tools, and behaviors like LEGO bricks
+- **Bundle-based**: Composable configuration packages for different scenarios
+- **Session persistence**: Pick up where you left off, even across projects
+- **Extensible**: Build your own modules, bundles, or entire custom experiences
+
+**Developer Tools:**
+
+- **[Log Viewer](https://github.com/microsoft/amplifier-app-log-viewer)**: Web-based tool for debugging sessions with real-time log streaming and interactive JSON inspection
+
+```bash
+# Install and run the log viewer while developing
+uv tool install git+https://github.com/microsoft/amplifier-app-log-viewer@main
+amplifier-log-viewer
+```
 
 ---
 
-## ✨ Features To Try
+## Supported AI Providers
 
-### 🔧 Create Amplifier-powered Tools for Scenarios
+Amplifier works with multiple AI providers:
 
-Amplifier is designed so **you can create new AI-powered tools** just by describing how they should think. See the [Create Your Own Tools](docs/CREATE_YOUR_OWN_TOOLS.md) guide for more information.
+- **Anthropic Claude** - Recommended, most tested (Sonnet 4.5, Opus 4.5, Haiku 4.5)
+- **OpenAI** - Good alternative (GPT-5.2, GPT-5.2-Pro, GPT-5.1-Codex)
+- **Azure OpenAI** - Enterprise users with Azure subscriptions (supports managed identity)
+- **Ollama** - Local, free, no API key needed (llama3, codellama, etc.)
 
-- _Tell Claude Code:_ `Walk me through creating my own scenario tool`
-
-- _View the documentation:_ [Scenario Creation Guide](docs/CREATE_YOUR_OWN_TOOLS.md)
-
-### 🎨 Design Intelligence
-
-Amplifier includes comprehensive design intelligence with 7 specialist agents, evidence-based design knowledge, and orchestrated design workflows:
-
-- _Tell Claude Code:_
-
-  `/designer create a button component with hover states and accessibility`
-
-  `Use the art-director agent to establish visual direction for my app`
-
-  `Deploy component-designer to create a reusable card component`
-
-- _Available Design Specialists:_
-
-  - **animation-choreographer** - Motion design and transitions
-  - **art-director** - Aesthetic strategy and visual direction
-  - **component-designer** - Component design and creation
-  - **design-system-architect** - Design system architecture
-  - **layout-architect** - Information architecture and layout
-  - **responsive-strategist** - Device adaptation and responsive design
-  - **voice-strategist** - Voice & tone for UI copy
-
-- _Design Framework:_
-
-  - **9 Dimensions** - Purpose, hierarchy, color, typography, spacing, responsive, accessibility, motion, voice
-  - **4 Layers** - Foundational, structural, behavioral, experiential
-  - **Evidence-based** - WCAG 2.1, color theory, animation principles, accessibility standards
-
-- _View the documentation:_ [Design Intelligence](docs/design/README.md)
-
-### 🤖 Explore Amplifier's agents on your code
-
-Try out one of the specialized experts:
-
-- _Tell Claude Code:_
-
-  `Use the zen-architect agent to design my application's caching layer`
-
-  `Deploy bug-hunter to find why my login system is failing`
-
-  `Have security-guardian review my API implementation for vulnerabilities`
-
-- _View the files:_ [Agents](.claude/agents/)
-
-### 📝 Document-Driven Development
-
-**Why use this?** Eliminate doc drift and context poisoning. When docs lead and code follows, your specifications stay perfectly in sync with reality.
-
-Execute a complete feature workflow with numbered slash commands:
+Switch providers anytime:
 
 ```bash
-/ddd:1-plan         # Design the feature
-/ddd:2-docs         # Update all docs (iterate until approved)
-/ddd:3-code-plan    # Plan code changes
-/ddd:4-code         # Implement and test (iterate until working)
-/ddd:5-finish       # Clean up and finalize
+# Switch provider (interactive - prompts for model/config)
+amplifier provider use openai
+
+# Or explicit
+amplifier provider use anthropic --model claude-opus-4-5
+amplifier provider use azure-openai --deployment gpt-5.2
 ```
 
-Each phase creates artifacts the next phase reads. You control all git operations with explicit authorization at every step. The workflow prevents expensive mistakes by catching design flaws before implementation.
-
-- _Tell Claude Code:_ `/ddd:0-help`
-
-- _View the documentation:_ [Document-Driven Development Guide](docs/document_driven_development/)
-
-### 🌳 Parallel Development
-
-**Why use this?** Stop wondering "what if" — build multiple solutions simultaneously and pick the winner.
-
-```bash
-# Try different approaches in parallel
-make worktree feature-jwt     # JWT authentication approach
-make worktree feature-oauth   # OAuth approach in parallel
-
-# Compare and choose
-make worktree-list            # See all experiments
-make worktree-rm feature-jwt  # Remove the one you don't want
-```
-
-Each worktree is completely isolated with its own branch, environment, and context.
-
-See the [Worktree Guide](docs/WORKTREE_GUIDE.md) for advanced features, such as hiding worktrees from VSCode when not in use, adopting branches from other machines, and more.
-
-- _Tell Claude Code:_ `What make worktree commands are available to me?`
-
-- _View the documentation:_ [Worktree Guide](docs/WORKTREE_GUIDE.md)
-
-### 📊 Enhanced Status Line
-
-See costs, model, and session info at a glance:
-
-**Example**: `~/repos/amplifier (main → origin) Opus 4.1 💰$4.67 ⏱18m`
-
-Shows:
-
-- Current directory and git branch/status
-- Model name with cost-tier coloring (red=high, yellow=medium, blue=low)
-- Running session cost and duration
-
-Enable with:
-
-```
-/statusline use the script at .claude/tools/statusline-example.sh
-```
-
-### 💬 Conversation Transcripts
-
-**Never lose context again.** Amplifier automatically exports your entire conversation before compaction, preserving all the details that would otherwise be lost. When Claude Code compacts your conversation to stay within token limits, you can instantly restore the full history.
-
-**Automatic Export**: A PreCompact hook captures your conversation before any compaction event:
-
-- Saves complete transcript with all content types (messages, tool usage, thinking blocks)
-- Timestamps and organizes transcripts in `.data/transcripts/`
-- Works for both manual (`/compact`) and auto-compact events
-
-**Easy Restoration**: Use the `/transcripts` command in Claude Code to restore your full conversation:
-
-```
-/transcripts  # Restores entire conversation history
-```
-
-The transcript system helps you:
-
-- **Continue complex work** after compaction without losing details
-- **Review past decisions** with full context
-- **Search through conversations** to find specific discussions
-- **Export conversations** for sharing or documentation
-
-**Transcript Commands** (via Makefile):
-
-```bash
-make transcript-list                # List available transcripts
-make transcript-search TERM="auth"  # Search past conversations
-make transcript-restore             # Restore full lineage (for CLI use)
-```
-
-### 🏗️ Workspace Pattern for Serious Projects
-
-**For long-term development**, consider using the workspace pattern where Amplifier hosts your project as a git submodule. This architectural approach provides:
-
-- **Clean boundaries** - Project files stay in project directory, Amplifier stays pristine and updatable
-- **Version control isolation** - Each component maintains independent git history
-- **Context persistence** - AGENTS.md preserves project guidance across sessions
-- **Scalability** - Work on multiple projects simultaneously without interference
-- **Philosophy alignment** - Project-specific decision filters and architectural principles
-
-Perfect for:
-
-- Projects that will live for months or years
-- Codebases with their own git repository
-- Teams collaborating on shared projects
-- When you want to update Amplifier without affecting your projects
-- Working on multiple projects that need isolation
-
-The pattern inverts the typical relationship: instead of your project containing Amplifier, Amplifier becomes a dedicated workspace that hosts your projects. Each project gets persistent context through AGENTS.md (AI guidance), philosophy documents (decision filters), and clear namespace boundaries using `@project-name/` syntax.
-
-- _Tell Claude Code:_ `What are the recommended workspace patterns for serious projects?`
-
-- _View the documentation:_ [Workspace Pattern Guide](docs/WORKSPACE_PATTERN.md) - complete setup, usage patterns, and migration from `ai_working/`.
-
-### 💡 Best Practices & Tips
-
-**Want to get the most out of Amplifier?** Check out [The Amplifier Way](docs/THIS_IS_THE_WAY.md) for battle-tested strategies including:
-
-- Understanding capability vs. context
-- Decomposition strategies for complex tasks
-- Using transcript tools to capture and improve workflows
-- Demo-driven development patterns
-- Practical tips for effective AI-assisted development
-
-- _Tell Claude Code:_ `What are the best practices to get the MOST out of Amplifier?`
-
-- _View the documentation:_ [The Amplifier Way](docs/THIS_IS_THE_WAY.md)
-
-### ⚙️ Development Commands
-
-```bash
-make check            # Format, lint, type-check
-make test             # Run tests
-make ai-context-files # Rebuild AI context
-```
-
-### 🧪 Testing & Benchmarks
-
-Testing and benchmarking are critical to ensuring that any product leveraging AI, including Amplifier, is quantitatively measured for performance and reliability.
-Currently, we leverage [terminal-bench](https://github.com/laude-institute/terminal-bench) to reproducibly benchmark Amplifier against other agents.
-Further details on how to run the benchmark can be found in [tests/terminal_bench/README.md](tests/terminal_bench/README.md).
+> **Note**: We've done most of our early testing with Anthropic Claude. Other providers are supported but may have rough edges we're actively smoothing out.
 
 ---
 
-## Disclaimer
+## Basic Usage
 
-> [!IMPORTANT] > **This is an experimental system. _We break things frequently_.**
+### Interactive Chat Mode
 
-- Not accepting contributions yet (but we plan to!)
-- No stability guarantees
-- Pin commits if you need consistency
-- This is a learning resource, not production software
-- **No support provided** - See [SUPPORT.md](SUPPORT.md)
+```bash
+# Start a conversation
+amplifier
+
+# Or explicitly
+amplifier run --mode chat
+```
+
+In chat mode:
+
+- Context persists across messages
+- Use `/help` to see available commands
+- Use `/tools`, `/agents`, `/status`, `/config` to inspect session
+- Use `/think` and `/do` to toggle plan mode
+- Type `exit` or Ctrl+C to quit
+
+### Single Commands
+
+```bash
+# Get quick answers
+amplifier run "Explain async/await in Python"
+
+# Generate code
+amplifier run "Create a REST API for a todo app with FastAPI"
+
+# Debug issues
+amplifier run "Why does this code throw a TypeError: [paste code]"
+```
+
+### Using Bundles
+
+Bundles are composable configuration packages that define tools, providers, agents, and behaviors:
+
+```bash
+# See current bundle (foundation is the default)
+amplifier bundle current
+
+# List available bundles
+amplifier bundle list
+
+# Use a specific bundle for one command
+amplifier run --bundle recipes "Your prompt"
+
+# Set as default
+amplifier bundle use foundation
+```
+
+**The `foundation` bundle** is the default and includes:
+
+- **Tools**: filesystem, bash, web, search, task delegation
+- **Agents**: 14 specialized agents (zen-architect, bug-hunter, git-ops, web-research, explorer, etc.)
+- **Behaviors**: logging, redaction, streaming UI, todo tracking
+
+Most users never need to change bundles—foundation provides everything for development work.
+
+### Working with Agents
+
+Specialized agents for focused tasks:
+
+```bash
+# Let the AI delegate to specialized agents
+amplifier run "Design a caching layer with careful consideration"
+# The AI will use zen-architect when appropriate
+
+# Or request specific agents
+amplifier run "Use bug-hunter to debug this error: [paste error]"
+```
+
+**Bundled agents:**
+
+- **zen-architect** - System design with ruthless simplicity
+- **bug-hunter** - Systematic debugging
+- **web-research** - Web research and content fetching
+- **modular-builder** - Code implementation
+- **explorer** - Breadth-first exploration of local code, docs, and other files with citation-ready summaries
+
+---
+
+## Sessions & Persistence
+
+Every interaction is automatically saved:
+
+```bash
+# Resume most recent session
+amplifier continue
+
+# Resume with new prompt (single-shot mode)
+amplifier continue "follow-up question"
+
+# List your recent sessions (current project only)
+amplifier session list
+
+# See all sessions across all projects
+amplifier session list --all-projects
+
+# View session details
+amplifier session show <session-id>
+
+# Resume a specific session (interactive mode)
+amplifier session resume <session-id>
+
+# Resume specific session with new prompt
+amplifier run --resume <session-id> "new question"
+```
+
+Sessions are project-scoped—when you're in `/home/user/myapp`, you see only `myapp` sessions. Change directories, see different sessions. Your work stays organized.
+
+---
+
+## Configuration
+
+### Switching Providers
+
+```bash
+# Switch provider (interactive - prompts for model)
+amplifier provider use openai
+
+# Or explicit
+amplifier provider use anthropic --model claude-opus-4-5
+
+# Azure OpenAI (needs endpoint + deployment)
+amplifier provider use azure-openai
+  Azure endpoint: https://my-resource.openai.azure.com/
+  Auth? [1] API key [2] Azure CLI: 2
+  Deployment: gpt-5.2
+
+# Configure where to save
+amplifier provider use openai --model gpt-5.2 --local      # Just you
+amplifier provider use anthropic --model claude-opus-4-5 --project  # Team
+
+# See what's active
+amplifier provider current
+```
+
+### Switching Bundles
+
+```bash
+# See current bundle
+amplifier bundle current
+
+# Switch bundle
+amplifier bundle use foundation
+amplifier bundle use recipes
+
+# Add external bundles
+amplifier bundle add git+https://github.com/microsoft/amplifier-bundle-recipes@main
+
+# See what's active
+amplifier bundle list
+```
+
+### Adding Capabilities
+
+```bash
+# Add module
+amplifier module add tool-jupyter
+amplifier module add tool-custom --project
+
+# See loaded modules
+amplifier module current
+```
+
+See [docs/USER_ONBOARDING.md#quick-reference](docs/USER_ONBOARDING.md#quick-reference) for complete command reference.
+
+---
+
+## Customizing Amplifier
+
+### Creating Custom Bundles
+
+Bundles configure your Amplifier environment with providers, tools, agents, and behaviors.
+
+**→ [Bundle Authoring Guide](https://github.com/microsoft/amplifier-foundation/blob/main/docs/BUNDLE_GUIDE.md)** - Complete guide to creating bundles
+
+### Creating Custom Agents
+
+Agents are specialized AI personas for focused tasks.
+
+**→ [Agent Authoring Guide](https://github.com/microsoft/amplifier-foundation/blob/main/docs/AGENT_AUTHORING.md)** - Complete guide to creating agents
+
+---
+
+## For Developers
+
+### Building on Amplifier
+
+**Core Libraries**:
+
+- **[amplifier-core](https://github.com/microsoft/amplifier-core)** - Ultra-thin kernel (~2,600 lines) providing module protocols, session lifecycle, and hooks
+- **[amplifier-foundation](https://github.com/microsoft/amplifier-foundation)** - Bundle composition library + the default `foundation` bundle
+
+**Reference Implementation**:
+
+- **[amplifier-app-cli](https://github.com/microsoft/amplifier-app-cli)** - CLI application (this implementation)
+
+**Architecture**:
+
+- **[Repository Rules](docs/REPOSITORY_RULES.md)** - Where docs go, what references what
+- **[Module Catalog](docs/MODULES.md)** - Available providers, tools, hooks, orchestrators
+
+---
+
+## What's Next
+
+> **Note**: Amplifier is under active development. Some documentation links are being consolidated. If you encounter issues, please report them.
+
+---
+
+## The Vision
+
+**Today**: A powerful CLI for AI-assisted development.
+
+**Tomorrow**: A platform where:
+
+- **Multiple interfaces** coexist - CLI, web, mobile, voice, IDE plugins
+- **Community modules** extend capabilities infinitely
+- **Dynamic mixing** - Amplifier composes custom solutions from available modules
+- **AI builds AI** - Use Amplifier to create new modules with minimal manual coding
+- **Collaborative AI** - Amplifier instances work together on complex tasks
+
+The modular foundation we're building today enables all of this. You're getting in early on something that's going to fundamentally change how we work with AI.
+
+---
+
+## Current State (Be Aware)
+
+This is an **early preview release**:
+
+- APIs are stabilizing but may change
+- Some features are experimental
+- Documentation is catching up with code
+- We're moving fast—breaking changes happen
+
+**What works today:**
+
+- ✅ Core AI interactions (Anthropic Claude)
+- ✅ Bundle-based configuration
+- ✅ Agent delegation
+- ✅ Session persistence
+- ✅ Module loading from git sources
+
+**What's rough around the edges:**
+
+- ⚠️ Other providers need more testing
+- ⚠️ Some error messages could be clearer
+- ⚠️ Documentation is incomplete in places
+- ⚠️ Installation experience will improve
+
+**Having issues?** See [Troubleshooting](docs/USER_ONBOARDING.md#troubleshooting) including [Clean Reinstall](docs/USER_ONBOARDING.md#clean-reinstall-recovery) for recovery steps.
+
+**Join us on this journey!** Fork, experiment, build modules, share feedback. This is the ground floor.
+
+---
 
 ## Contributing
 

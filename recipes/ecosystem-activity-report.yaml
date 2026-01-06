@@ -1,0 +1,874 @@
+name: "ecosystem-activity-report"
+description: "Analyze activity across the Amplifier ecosystem by discovering repos from MODULES.md"
+version: "1.6.0"
+author: "Amplifier"
+tags: ["amplifier", "ecosystem", "github", "activity", "modules", "discovery"]
+
+# Amplifier Ecosystem Activity Report
+#
+# This recipe is the top-level entry point for analyzing activity across
+# the Amplifier ecosystem. It:
+#
+# 1. Discovers the current GitHub user (for filtering to your activity)
+# 2. Parses date range from natural language
+# 3. Reads MODULES.md to discover all ecosystem repos
+# 4. Filters repos based on criteria (org, name pattern)
+# 5. Calls the generic multi-repo recipe from @recipes bundle
+#
+# v1.6.0: Recipe quality improvements from recipe-author review
+#         - Add api_delay_seconds configurable rate limiting (was hardcoded 0.5s)
+#         - Add api_retry_attempts for resilient GitHub API calls
+#         - Replace manual JSON construction with jq -n (safer)
+#         - Standardize on printf over heredoc for YAML safety
+#
+# v1.5.0: Timezone and date handling fixes
+#         - Use LOCAL timezone for date parsing (not UTC)
+#         - No end date for "since X" queries (prevents missing recent commits)
+#         - Explicit timezone detection and display in description
+#
+# v1.4.0: Reliability and completeness improvements
+#         - Fix "all activity" mode to actually check repos for commits (was skipping)
+#         - Fix PR detection to use created_at/merged_at (not updated_at)
+#         - Add explicit write-report step (LLM file writes are non-deterministic)
+#         - Change synthesize-report on_error to "fail" (critical step)
+#
+# v1.3.0: Natural language activity scope
+#         - Replace author_filter with activity_scope (natural language)
+#         - Support: "my activity", "all", "bkrabach", "me and robotdad", etc.
+#         - LLM interprets scope request into structured filter
+#
+# v1.2.0: Performance optimizations
+#         - parallel: true default for ~4x faster execution
+#         - Pass precomputed values to sub-recipes (eliminates 12 redundant LLM calls)
+#         - Convert discovery-summary to bash (faster, deterministic)
+#         - Add parallel_analysis toggle for user control
+#
+# v1.1.0: Converted bash-heavy steps to type: "bash" for efficiency
+#         (no LLM overhead for deterministic shell commands)
+
+recursion:
+  max_depth: 3
+  max_total_steps: 200
+#
+# Usage (your activity today - default):
+#   amplifier run "execute recipe @amplifier:recipes/ecosystem-activity-report.yaml"
+#
+# Usage (all ecosystem activity since yesterday):
+#   amplifier run 'execute recipe ... with context {
+#     "activity_scope": "all activity",
+#     "date_range": "since yesterday"
+#   }'
+#
+# Usage (specific user):
+#   amplifier run 'execute recipe ... with context {
+#     "activity_scope": "robotdad",
+#     "date_range": "last week"
+#   }'
+#
+# Usage (multiple users):
+#   amplifier run 'execute recipe ... with context {
+#     "activity_scope": "me and robotdad"
+#   }'
+#
+# Requirements:
+#   - gh CLI installed and authenticated
+#   - recipes bundle loaded (provides generic repo-activity-analysis recipe)
+
+context:
+  # Date range (natural language) - defaults to today
+  date_range: "today"
+  
+  # Activity scope (natural language) - who's activity to show
+  # Examples:
+  #   "my activity" or "" (default) - current authenticated user
+  #   "all activity" or "everyone" - no author filter
+  #   "bkrabach" or "activity from bkrabach" - specific user
+  #   "me and robotdad" - multiple users
+  #   "the team" - attempts to discover team from recent contributors
+  activity_scope: ""
+  
+  # Filter repos by regex pattern (applied to repo name)
+  # Examples: "amplifier-core", "amplifier-core|amplifier-foundation", "" (all)
+  repo_filter: ""
+  
+  # Filter repos by GitHub org (default: microsoft)
+  org_filter: "microsoft"
+  
+  # Working directory for intermediate files
+  working_dir: "./ai_working"
+  
+  # Output report filename
+  report_filename: "ecosystem-activity-report.md"
+  
+  # Parallel analysis mode - set false if hitting rate limits or debugging
+  parallel_analysis: true
+  
+  # Rate limiting: delay between GitHub API calls (seconds)
+  # Increase if hitting rate limits, decrease if you have higher limits
+  api_delay_seconds: 0.5
+  
+  # Retry configuration for GitHub API calls
+  # Set to 1 for no retries, higher for more resilience to transient failures
+  api_retry_attempts: 3
+  
+  # Default values for step outputs (prevents undefined variable errors)
+  user_info: {"username": "", "discovered": false}
+  parsed_date: {"original": "", "iso_since": "", "iso_until": "", "gh_format": ""}
+  modules_content: {"path": "", "content": "", "error": null}
+  discovered_repos: {"total": 0, "repos": []}
+  filtered_repos: {"count": 0, "repos": [], "dropped": []}
+  activity_checks: []
+  active_repos: {"count": 0, "repos": [], "skipped": []}
+
+steps:
+  # ==========================================================================
+  # Step 0: Validate prerequisites (fail fast if tools missing)
+  # ==========================================================================
+  # BASH STEP - Check required tools before starting expensive operations
+  # Why bash: Deterministic checks, no LLM needed, fail fast on missing deps
+  - id: "validate-prerequisites"
+    type: "bash"
+    command: |
+      set -euo pipefail
+      
+      errors=""
+      warnings=""
+      
+      # Check gh CLI
+      if ! command -v gh &>/dev/null; then
+        errors="${errors}ERROR: gh CLI not found. Install: https://cli.github.com/\n"
+      elif ! gh auth status &>/dev/null; then
+        errors="${errors}ERROR: gh CLI not authenticated. Run: gh auth login\n"
+      fi
+      
+      # Check jq
+      if ! command -v jq &>/dev/null; then
+        errors="${errors}ERROR: jq not found. Install: brew install jq (macOS) or apt install jq (Linux)\n"
+      fi
+      
+      # Check base64 (usually available, but verify)
+      if ! command -v base64 &>/dev/null; then
+        errors="${errors}ERROR: base64 not found (required for decoding API responses)\n"
+      fi
+      
+      # Optional: Check for rate limiting issues
+      remaining=$(gh api rate_limit --jq '.resources.core.remaining' 2>/dev/null || echo "unknown")
+      if [ "$remaining" != "unknown" ] && [ "$remaining" -lt 100 ]; then
+        warnings="${warnings}WARNING: GitHub API rate limit low ($remaining remaining)\n"
+      fi
+      
+      # Output results
+      if [ -n "$errors" ]; then
+        printf "$errors" >&2
+        printf "$warnings" >&2
+        echo '{"valid": false, "errors": "Missing prerequisites - see stderr"}'
+        exit 1
+      else
+        if [ -n "$warnings" ]; then
+          printf "$warnings" >&2
+        fi
+        echo "{\"valid\": true, \"gh_version\": \"$(gh --version | head -1)\", \"jq_version\": \"$(jq --version)\", \"rate_limit_remaining\": \"$remaining\"}"
+      fi
+    output: "prerequisites"
+    timeout: 30
+    on_error: "fail"
+
+  # ==========================================================================
+  # Step 1: Setup and check if activity scope needs LLM interpretation
+  # ==========================================================================
+  # BASH STEP - Handle simple cases without LLM, flag complex cases for LLM
+  - id: "setup-and-check-scope"
+    type: "bash"
+    command: |
+      set -euo pipefail
+      
+      # Create all working directories upfront
+      mkdir -p {{working_dir}}/{discovery,repos,reports}
+      
+      # Get current user for context
+      current_user=$(gh api user --jq '.login' 2>/dev/null || echo "")
+      
+      scope="{{activity_scope}}"
+      scope_lower=$(echo "$scope" | tr '[:upper:]' '[:lower:]')
+      
+      # Check for simple cases that don't need LLM
+      if [ -z "$scope" ] || [ "$scope_lower" = "my activity" ] || [ "$scope_lower" = "mine" ] || [ "$scope_lower" = "me" ]; then
+        # Current user - no LLM needed
+        jq -n --arg user "$current_user" '{
+          needs_llm: "false",
+          filter_mode: "current_user",
+          usernames: [$user],
+          description: ("your activity (" + $user + ")"),
+          original: "{{activity_scope}}"
+        }'
+      elif [ "$scope_lower" = "all" ] || [ "$scope_lower" = "everyone" ] || [ "$scope_lower" = "all activity" ]; then
+        # All activity - no LLM needed
+        echo '{"needs_llm": "false", "filter_mode": "all", "usernames": [], "description": "all activity", "original": "{{activity_scope}}"}'
+      elif echo "$scope" | grep -qE '^@?[a-zA-Z0-9_-]+$'; then
+        # Simple username (no spaces, "and", etc.) - no LLM needed
+        username=$(echo "$scope" | sed 's/^@//' | tr '[:upper:]' '[:lower:]')
+        jq -n --arg user "$username" '{
+          needs_llm: "false",
+          filter_mode: "specific_users",
+          usernames: [$user],
+          description: ("activity from " + $user),
+          original: "{{activity_scope}}"
+        }'
+      else
+        # Complex case - needs LLM interpretation
+        jq -n --arg scope "$scope" --arg user "$current_user" '{
+          needs_llm: "true",
+          activity_scope: $scope,
+          current_user: $user
+        }'
+      fi
+    output: "scope_check"
+    parse_json: true
+    timeout: 60
+
+  # ==========================================================================
+  # Step 1b: Interpret activity scope (LLM - only for complex cases)
+  # ==========================================================================
+  # AGENT STEP - LLM interprets complex natural language requests
+  - id: "interpret-activity-scope-llm"
+    condition: "{{scope_check.needs_llm}} == 'true'"
+    agent: "foundation:explorer"
+    prompt: |
+      Interpret the activity scope request to determine whose GitHub activity to show.
+      
+      ## Input
+      
+      Activity scope request: "{{scope_check.activity_scope}}"
+      Current authenticated user: "{{scope_check.current_user}}"
+      
+      ## Interpretation Guidelines
+      
+      | Input | Interpretation |
+      |-------|---------------|
+      | "me and robotdad" | Multiple users: [current_user, robotdad] |
+      | "bkrabach and robotdad" | Multiple users: [bkrabach, robotdad] |
+      | "activity from john" | Specific user: john |
+      | "john's activity" | Specific user: john |
+      | "the team", "our team" | Use current_user (can't auto-discover team) |
+      
+      Handle variations gracefully:
+      - Case insensitive: "BKRABACH" → "bkrabach"
+      - With/without @: "@john" → "john"
+      - Possessive: "john's activity" → "john"
+      - Pronouns: "my", "mine", "me" → current_user
+      
+      ## Output
+      
+      Return JSON:
+      {
+        "filter_mode": "current_user" | "all" | "specific_users",
+        "usernames": ["list", "of", "usernames"],
+        "description": "human readable (e.g., 'activity from bkrabach and robotdad')",
+        "original": "{{scope_check.activity_scope}}"
+      }
+    output: "user_info_llm"
+    parse_json: true
+    timeout: 60
+
+  # ==========================================================================
+  # Step 1c: Use precomputed scope (only runs if LLM was skipped)
+  # ==========================================================================
+  - id: "use-precomputed-scope"
+    condition: "{{scope_check.needs_llm}} == 'false'"
+    type: "bash"
+    command: |
+      echo '{{scope_check}}' | jq 'del(.needs_llm)'
+    output: "user_info"
+    parse_json: true
+    timeout: 10
+
+  # ==========================================================================
+  # Step 1d: Use LLM scope (only runs if LLM step ran)
+  # ==========================================================================
+  - id: "use-llm-scope"
+    condition: "{{scope_check.needs_llm}} == 'true'"
+    type: "bash"
+    command: |
+      cat << 'SCOPEEOF'
+      {{user_info_llm}}
+      SCOPEEOF
+    output: "user_info"
+    parse_json: true
+    timeout: 10
+
+  # ==========================================================================
+  # Step 2: Parse date range (LLM for natural language flexibility)
+  # ==========================================================================
+  # AGENT STEP - LLM handles natural language interpretation
+  # CRITICAL: Uses LOCAL timezone, NOT UTC. No end date for "since X" queries.
+  - id: "parse-date-range"
+    agent: "foundation:explorer"
+    prompt: |
+      Parse the natural language date range into ISO 8601 format for GitHub API.
+      
+      ## Input
+      
+      Date range: "{{date_range}}"
+      
+      ## CRITICAL: Use LOCAL Timezone
+      
+      First, get the current date/time IN THE USER'S LOCAL TIMEZONE:
+      ```bash
+      # Get local time AND timezone offset
+      date '+%Y-%m-%d %H:%M:%S %Z (UTC%:z)'
+      ```
+      
+      The user's request is in THEIR local time. "Tuesday 3pm" means 3pm in their
+      timezone, not UTC. You must:
+      1. Determine the start time in the user's local timezone
+      2. Convert to UTC (with Z suffix) for the GitHub API
+      
+      ## CRITICAL: No End Date for Open-Ended Queries
+      
+      When the query is "since X" or "from X" without an explicit end date:
+      - Set iso_until to "" (empty string)
+      - Do NOT set an end date - we want ALL commits since the start time
+      - This prevents timezone edge cases from missing recent commits
+      
+      Only set iso_until when there's an EXPLICIT end date like "Dec 15-20".
+      
+      ## Interpretation Guidelines
+      
+      | Input | Start (local time) | End |
+      |-------|-------------------|-----|
+      | "today" | Midnight today | "" (none - open ended) |
+      | "since yesterday" | Midnight yesterday | "" (none) |
+      | "since Tuesday 3pm" | Tuesday 15:00 local | "" (none) |
+      | "last 7 days" | 7 days ago midnight | "" (none) |
+      | "Dec 15-20" | Dec 15 00:00 local | Dec 20 23:59:59 local (explicit range) |
+      
+      Handle variations gracefully:
+      - "the past few days" → ~3 days ago, no end date
+      - "recently" → 7 days ago, no end date
+      - Any "since X", "from X", "after X" → no end date
+      
+      ## Output
+      
+      Return JSON:
+      {
+        "original": "{{date_range}}",
+        "iso_since": "YYYY-MM-DDTHH:MM:SSZ",
+        "iso_until": "",
+        "gh_format": "YYYY-MM-DD",
+        "local_timezone": "detected timezone (e.g., PST, EST, UTC-8)",
+        "description": "human readable (e.g., 'since Tuesday 3pm PST (2024-12-31T23:00:00Z)')"
+      }
+      
+      IMPORTANT: iso_until should be "" (empty) unless an explicit end date was given.
+    output: "parsed_date"
+    parse_json: true
+    timeout: 60
+
+  # ==========================================================================
+  # Step 3: Fetch MODULES.md
+  # ==========================================================================
+  # BASH STEP - Direct GitHub API fetch, no interpretation needed
+  # Why bash: gh api + base64 decode is deterministic, no reasoning required
+  - id: "fetch-modules-md"
+    type: "bash"
+    command: |
+      set -euo pipefail
+      
+      # Fetch from GitHub API (authoritative source)
+      gh api repos/microsoft/amplifier/contents/docs/MODULES.md \
+        --jq '.content' | base64 -d > {{working_dir}}/discovery/MODULES.md
+      
+      # Get file info
+      if [ -f "{{working_dir}}/discovery/MODULES.md" ]; then
+        len=$(wc -c < "{{working_dir}}/discovery/MODULES.md" | tr -d ' ')
+        echo "{\"path\": \"github-api\", \"saved_to\": \"{{working_dir}}/discovery/MODULES.md\", \"content_length\": $len, \"error\": null}"
+      else
+        echo '{"path": null, "saved_to": null, "content_length": 0, "error": "Failed to fetch MODULES.md"}'
+      fi
+    output: "modules_content"
+    timeout: 120
+
+  # ==========================================================================
+  # Step 4: Extract repos using grep (reliable extraction)
+  # ==========================================================================
+  # BASH STEP - Regex extraction from structured markdown
+  # Why bash: grep/sed/sort are faster and more reliable than LLM for URL extraction
+  - id: "extract-repos-grep"
+    type: "bash"
+    command: |
+      cd {{working_dir}}/discovery
+      
+      # Extract all GitHub URLs, normalize, deduplicate, and format as JSON
+      grep -oE 'https://github\.com/[^/]+/[^/)"'"'"'#@` ]+' MODULES.md \
+        | sed 's/\.git$//' \
+        | sed 's/[[:space:]]*$//' \
+        | sort -u \
+        | while read url; do
+            owner=$(echo "$url" | cut -d'/' -f4)
+            repo=$(echo "$url" | cut -d'/' -f5)
+            echo "{\"owner\": \"$owner\", \"name\": \"$repo\", \"url\": \"$url\"}"
+          done > repos-extracted.jsonl
+      
+      # Build final JSON using jq -n (safer than manual construction)
+      jq -n --slurpfile repos <(jq -s '.' repos-extracted.jsonl) \
+        '{total: ($repos[0] | length), repos: $repos[0]}' > all-repos.json
+      
+      cat all-repos.json
+    output: "discovered_repos"
+    timeout: 120
+
+  # ==========================================================================
+  # Step 4b: Verify extraction
+  # ==========================================================================
+  # BASH STEP - Sanity check that expected repos are present
+  # Why bash: Simple string matching, no semantic understanding needed
+  - id: "verify-extraction"
+    type: "bash"
+    command: |
+      cd {{working_dir}}/discovery
+      
+      # Count GitHub URLs in source (rough check)
+      source_count=$(grep -c 'github.com/' MODULES.md || echo "0")
+      extracted_count={{discovered_repos.total}}
+      
+      echo "Source mentions: $source_count"
+      echo "Extracted unique: $extracted_count"
+      
+      # Check for key repos we expect to find
+      expected="amplifier amplifier-core amplifier-foundation amplifier-app-cli"
+      missing=""
+      for repo in $expected; do
+        if ! grep -q "\"name\": \"$repo\"" all-repos.json; then
+          missing="$missing $repo"
+        fi
+      done
+      
+      if [ -n "$missing" ]; then
+        echo "WARNING: Missing expected repos:$missing"
+        echo '{"verified": false, "issue": "missing_expected", "missing": "'$missing'"}'
+      else
+        echo '{"verified": true, "source_mentions": '$source_count', "extracted_unique": '$extracted_count'}'
+      fi
+    output: "extraction_verified"
+    timeout: 60
+
+  # ==========================================================================
+  # Step 5: Filter repos using jq
+  # ==========================================================================
+  # BASH STEP - jq filtering, no LLM needed
+  - id: "filter-repos"
+    type: "bash"
+    command: |
+      cd {{working_dir}}/discovery
+      
+      org_filter="{{org_filter}}"
+      repo_filter="{{repo_filter}}"
+      
+      # Start with all repos
+      cp all-repos.json filtered-repos.json
+      
+      # Apply org filter if set
+      if [ -n "$org_filter" ]; then
+        jq --arg org "$org_filter" '{
+          total: ([.repos[] | select(.owner == $org)] | length),
+          repos: [.repos[] | select(.owner == $org)]
+        }' all-repos.json > filtered-repos.json
+      fi
+      
+      # Apply repo name filter if set (grep-style regex)
+      if [ -n "$repo_filter" ]; then
+        jq --arg pattern "$repo_filter" '{
+          total: ([.repos[] | select(.name | test($pattern; "i"))] | length),
+          repos: [.repos[] | select(.name | test($pattern; "i"))]
+        }' filtered-repos.json > filtered-repos-tmp.json
+        mv filtered-repos-tmp.json filtered-repos.json
+      fi
+      
+      # Build output with dropped repos
+      original=$(jq '.total' all-repos.json)
+      filtered=$(jq '.total' filtered-repos.json)
+      
+      # Get dropped repo names
+      dropped=$(jq -r '.repos[].name' all-repos.json | while read name; do
+        if ! jq -e --arg n "$name" '.repos[] | select(.name == $n)' filtered-repos.json >/dev/null 2>&1; then
+          echo "$name"
+        fi
+      done | jq -R -s 'split("\n") | map(select(length > 0))')
+      
+      # Final output
+      jq --argjson orig "$original" --argjson dropped "$dropped" \
+        --arg org "$org_filter" --arg pattern "$repo_filter" '{
+        original_count: $orig,
+        count: .total,
+        filters: {org: $org, repo_pattern: $pattern},
+        repos: .repos,
+        dropped: $dropped
+      }' filtered-repos.json
+    output: "filtered_repos"
+    timeout: 60
+
+  # ==========================================================================
+  # Step 6: Quick activity check (BATCH - bash loop with rate limiting)
+  # ==========================================================================
+  # BASH STEP - Batch API calls to check for activity
+  # Why bash: gh api calls are deterministic, rate limiting is simple loop logic
+  - id: "quick-activity-check"
+    type: "bash"
+    command: |
+      cd {{working_dir}}/discovery
+      
+      # Save repos for processing (printf safer than heredoc in YAML)
+      printf '%s\n' '{{filtered_repos.repos}}' > repos-to-check.json
+      
+      filter_mode="{{user_info.filter_mode}}"
+      since_iso="{{parsed_date.iso_since}}"
+      gh_date="{{parsed_date.gh_format}}"
+      
+      # Save usernames for processing (may be multiple)
+      printf '%s\n' '{{user_info.usernames}}' > usernames.json
+      
+      # Configurable rate limiting and retry settings
+      api_delay={{api_delay_seconds}}
+      max_retries={{api_retry_attempts}}
+      
+      # Helper function: gh API call with retry logic
+      gh_api_retry() {
+        local endpoint="$1"
+        local jq_filter="$2"
+        local attempt=1
+        local result=""
+        
+        while [ $attempt -le $max_retries ]; do
+          result=$(gh api "$endpoint" --jq "$jq_filter" 2>/dev/null) && break
+          attempt=$((attempt + 1))
+          [ $attempt -le $max_retries ] && sleep $((attempt * 2))  # Exponential backoff
+        done
+        
+        echo "${result:-0}"
+      }
+      
+      # Process all repos in a bash loop with rate limiting
+      echo "["
+      first=true
+      
+      jq -c '.[]' repos-to-check.json | while read repo_json; do
+        owner=$(echo "$repo_json" | jq -r '.owner')
+        name=$(echo "$repo_json" | jq -r '.name')
+        url=$(echo "$repo_json" | jq -r '.url')
+        
+        # Comma handling for JSON array
+        if [ "$first" = "true" ]; then
+          first=false
+        else
+          echo ","
+          # Rate limiting: configurable delay between repos
+          sleep $api_delay
+        fi
+        
+        if [ "$filter_mode" = "all" ]; then
+          # Check if repo has ANY commits in date range (don't skip!)
+          all_commits=$(gh_api_retry "repos/$owner/$name/commits?since=$since_iso&per_page=1" 'length')
+          
+          if [ "${all_commits:-0}" -gt 0 ]; then
+            # Get actual commit count for repos with activity
+            actual_count=$(gh_api_retry "repos/$owner/$name/commits?since=$since_iso&per_page=100" 'length')
+            jq -n --arg repo "$name" --arg owner "$owner" --arg url "$url" --argjson commits "$actual_count" \
+              '{repo: $repo, owner: $owner, url: $url, commits: $commits, prs: -1, has_activity: true}'
+          else
+            # Also check PRs - repo might have PR-only activity
+            all_prs=$(gh_api_retry "repos/$owner/$name/pulls?state=all&per_page=100" \
+              "[.[] | select(.created_at >= \"$since_iso\" or .merged_at >= \"$since_iso\")] | length")
+            if [ "${all_prs:-0}" -gt 0 ]; then
+              jq -n --arg repo "$name" --arg owner "$owner" --arg url "$url" --argjson prs "$all_prs" \
+                '{repo: $repo, owner: $owner, url: $url, commits: 0, prs: $prs, has_activity: true}'
+            else
+              jq -n --arg repo "$name" --arg owner "$owner" --arg url "$url" \
+                '{repo: $repo, owner: $owner, url: $url, commits: 0, prs: 0, has_activity: false}'
+            fi
+          fi
+        else
+          # Check commits and PRs for each username in the list
+          total_commits=0
+          total_prs=0
+          
+          for username in $(jq -r '.[]' usernames.json); do
+            # Check commits for this user (with retry)
+            user_commits=$(gh_api_retry "repos/$owner/$name/commits?author=$username&since=$since_iso&per_page=100" 'length')
+            total_commits=$((total_commits + user_commits))
+            
+            # Rate limiting between API calls
+            sleep $api_delay
+            
+            # Check PRs for this user (with retry)
+            user_prs=$(gh_api_retry "repos/$owner/$name/pulls?state=all&per_page=100" \
+              "[.[] | select(.user.login == \"$username\" and (.created_at >= \"$since_iso\" or .merged_at >= \"$since_iso\"))] | length")
+            total_prs=$((total_prs + user_prs))
+          done
+          
+          # Determine activity and output using jq -n (safer JSON construction)
+          if [ "$total_commits" -gt 0 ] 2>/dev/null || [ "$total_prs" -gt 0 ] 2>/dev/null; then
+            jq -n --arg repo "$name" --arg owner "$owner" --arg url "$url" \
+              --argjson commits "$total_commits" --argjson prs "$total_prs" \
+              '{repo: $repo, owner: $owner, url: $url, commits: $commits, prs: $prs, has_activity: true}'
+          else
+            jq -n --arg repo "$name" --arg owner "$owner" --arg url "$url" \
+              --argjson commits "$total_commits" --argjson prs "$total_prs" \
+              '{repo: $repo, owner: $owner, url: $url, commits: $commits, prs: $prs, has_activity: false}'
+          fi
+        fi
+      done
+      
+      echo "]"
+    output: "activity_checks"
+    timeout: 900
+
+  # ==========================================================================
+  # Step 7: Filter to repos with activity
+  # ==========================================================================
+  # BASH STEP - Filter JSON array by boolean field
+  # Why bash: jq filtering is deterministic, no reasoning needed
+  - id: "filter-to-active"
+    type: "bash"
+    command: |
+      cd {{working_dir}}/discovery
+      
+      # Save activity checks to file for processing (printf safer than heredoc in YAML)
+      printf '%s\n' '{{activity_checks}}' > activity-checks.json
+      
+      # Filter to active repos and build output
+      jq '{
+        count: ([.[] | select(.has_activity == true)] | length),
+        repos: [.[] | select(.has_activity == true) | {owner, name: .repo, url, commits, prs}],
+        skipped: [.[] | select(.has_activity == false) | .repo],
+        skipped_count: ([.[] | select(.has_activity == false)] | length)
+      }' activity-checks.json > active-repos.json
+      
+      cat active-repos.json
+    output: "active_repos"
+    timeout: 60
+
+  # ==========================================================================
+  # Step 8: Show discovery summary (Bash for speed and determinism)
+  # ==========================================================================
+  # BASH STEP - Format and display discovery results
+  # Why bash: Structured data formatting is deterministic, faster than LLM
+  - id: "discovery-summary"
+    type: "bash"
+    command: |
+      # Use printf instead of heredoc for YAML safety
+      printf '%s\n' "============================================================"
+      printf '%s\n' "AMPLIFIER ECOSYSTEM ACTIVITY REPORT"
+      printf '%s\n' "============================================================"
+      printf '%s\n' "Scope:      {{user_info.description}}"
+      printf '%s\n' "Date Range: {{parsed_date.description}}"
+      printf '%s\n' ""
+      printf '%s\n' "Discovery:  {{discovered_repos.total}} repos found → {{filtered_repos.count}} after org filter → {{active_repos.count}} with activity"
+      printf '%s\n' ""
+      
+      if [ "{{active_repos.count}}" -gt 0 ]; then
+        printf '%s\n' "Analyzing ({{active_repos.count}} repos):"
+        printf '%s\n' '{{active_repos.repos}}' | jq -r '.[] | "  • \(.name) - \(.commits) commits, \(.prs) PRs"'
+      else
+        printf '%s\n' "No repos with activity in date range."
+      fi
+      
+      printf '%s\n' ""
+      if [ "{{active_repos.skipped_count}}" -gt 0 ]; then
+        printf '%s\n' "Skipped ({{active_repos.skipped_count}} repos - no activity):"
+        printf '%s\n' '{{active_repos.skipped}}' | jq -r 'join(", ")' | fold -s -w 70 | sed 's/^/  /'
+      fi
+      
+      printf '%s\n' ""
+      printf '%s\n' "Estimated time: ~{{active_repos.count}} minutes (parallel: {{parallel_analysis}})"
+      printf '%s\n' "============================================================"
+      
+      # Output for next step
+      printf '%s\n' '{{active_repos.repos}}' | jq -c '{displayed: true, repos_to_analyze: [.[].name]}'
+    output: "summary"
+    parse_json: true
+    timeout: 30
+
+  # ==========================================================================
+  # Step 9: Analyze each repo using generic recipe
+  # ==========================================================================
+  # RECIPE STEP - Delegate detailed analysis to reusable sub-recipe
+  # Why recipe: Encapsulates complex per-repo analysis, enables parallel execution
+  # Optimization: Pass precomputed values to skip redundant LLM calls in sub-recipe
+  - id: "analyze-repos"
+    foreach: "{{active_repos.repos}}"
+    as: "repo"
+    parallel: "{{parallel_analysis}}"
+    collect: "repo_analyses"
+    type: "recipe"
+    recipe: "@recipes:examples/repo-activity-analysis.yaml"
+    context:
+      repo_url: "{{repo.url}}"
+      date_range: "{{parsed_date.description}}"
+      working_dir: "{{working_dir}}"
+      include_deep_dive: false
+      # Precomputed values - sub-recipe skips expensive steps if these are provided
+      _precomputed:
+        date_since_iso: "{{parsed_date.iso_since}}"
+        date_since_date: "{{parsed_date.gh_format}}"
+        date_description: "{{parsed_date.description}}"
+        repo_owner: "{{repo.owner}}"
+        repo_name: "{{repo.name}}"
+    output: "single_repo_result"
+    timeout: 600
+    on_error: "continue"
+
+  # ==========================================================================
+  # Step 10: Synthesize final report
+  # ==========================================================================
+  # AGENT STEP - Synthesize findings into cohesive narrative report
+  # Why agent: Requires semantic understanding, prioritization, storytelling
+  - id: "synthesize-report"
+    agent: "foundation:zen-architect"
+    mode: "ARCHITECT"
+    prompt: |
+      Create the final Amplifier Ecosystem Activity Report.
+      
+      ## Input Data
+      
+      Scope: {{user_info.description}}
+      Date Range: {{parsed_date.description}}
+      Repos analyzed: {{active_repos.count}}
+      Repos skipped (no activity): {{active_repos.skipped}}
+      
+      Individual analyses: {{repo_analyses}}
+      
+      ## Report Structure
+      
+      Create comprehensive markdown report:
+      
+      ```markdown
+      # Amplifier Ecosystem Activity Report
+      
+      **Generated**: [current timestamp]
+      **Scope**: {{user_info.description}}
+      **Date Range**: {{parsed_date.description}}
+      **Repos Analyzed**: {{active_repos.count}}
+      
+      ---
+      
+      ## Executive Summary
+      
+      - **Total commits**: N
+      - **Total PRs**: N  
+      - **Repos with activity**: N of {{active_repos.count}}
+      
+      ### Key Highlights
+      
+      [2-3 bullet points of most significant changes]
+      
+      ---
+      
+      ## Activity by Repository
+      
+      [For each repo WITH activity, ordered by activity level:]
+      
+      ### {repo_name}
+      
+      **Commits**: N | **PRs**: N
+      
+      **Summary**: [1-2 sentence summary]
+      
+      **Key Changes**:
+      - [Notable changes]
+      
+      ---
+      
+      ## Cross-Cutting Observations
+      
+      [Patterns observed across repos - coordinated changes, themes]
+      
+      ## Repositories with No Activity
+      
+      [List repos with no changes in date range]
+      
+      ---
+      *Generated by @amplifier:recipes/ecosystem-activity-report.yaml*
+      ```
+      
+      ## Output
+      
+      Return the complete markdown report content.
+      DO NOT write to files - the next step handles file writing.
+      Just return the report as your response.
+    output: "final_report"
+    timeout: 900
+    on_error: "fail"
+
+  # ==========================================================================
+  # Step 10b: Write report to file (GUARANTEED file write)
+  # ==========================================================================
+  # BASH STEP - Explicit file write since LLM file writes are non-deterministic
+  # Why bash: Guarantees file is written, verifies success, atomic operation
+  - id: "write-report"
+    type: "bash"
+    command: |
+      set -euo pipefail
+      
+      mkdir -p {{working_dir}}/reports
+      
+      # Write the report content to file using printf (safer than heredoc)
+      # Write to temp file first, then move (atomic write)
+      printf '%s\n' '{{final_report}}' > {{working_dir}}/reports/{{report_filename}}.tmp
+      mv {{working_dir}}/reports/{{report_filename}}.tmp {{working_dir}}/reports/{{report_filename}}
+      
+      # Verify the write succeeded
+      if [ -s "{{working_dir}}/reports/{{report_filename}}" ]; then
+        size=$(wc -c < "{{working_dir}}/reports/{{report_filename}}" | tr -d ' ')
+        echo "Report written: {{working_dir}}/reports/{{report_filename}} ($size bytes)"
+        echo "{\"written\": true, \"path\": \"{{working_dir}}/reports/{{report_filename}}\", \"size\": $size}"
+      else
+        echo "ERROR: Failed to write report" >&2
+        echo "{\"written\": false, \"error\": \"File empty or missing\"}"
+        exit 1
+      fi
+    output: "report_written"
+    parse_json: true
+    timeout: 60
+    on_error: "fail"
+
+  # ==========================================================================
+  # Step 11: Completion and cleanup
+  # ==========================================================================
+  # BASH STEP - Print completion summary and remove temp files
+  # Why bash: echo/rm are deterministic, no reasoning needed for cleanup
+  - id: "complete"
+    type: "bash"
+    command: |
+      # Get report path
+      report_path=$(realpath {{working_dir}}/reports/{{report_filename}} 2>/dev/null || echo "{{working_dir}}/reports/{{report_filename}}")
+      
+      # Print completion summary using printf (standardized over heredoc)
+      printf '%s\n' "============================================================"
+      printf '%s\n' "REPORT COMPLETE"
+      printf '%s\n' "============================================================"
+      printf '%s\n' "Scope:  {{user_info.description}}"
+      printf '%s\n' "Range:  {{parsed_date.description}}"
+      printf '%s\n' "Repos:  {{active_repos.count}} analyzed, {{active_repos.skipped_count}} skipped"
+      printf '%s\n' "Report: $report_path"
+      printf '%s\n' "============================================================"
+      
+      # Cleanup temporary files (keep reports/)
+      printf '%s\n' ""
+      printf '%s\n' "Cleaning up temporary files..."
+      
+      # Remove discovery intermediate files
+      rm -rf {{working_dir}}/discovery
+      
+      # Remove any cloned repos (if any were created)
+      rm -rf {{working_dir}}/repos
+      
+      # Show what remains
+      printf '%s\n' "Remaining in {{working_dir}}:"
+      ls -la {{working_dir}}/
+      
+      printf '%s\n' ""
+      # Use jq -n for safe JSON construction
+      jq -n --arg path "$report_path" '{completed: true, report_path: $path, cleanup: "done"}'
+    output: "completion"
+    timeout: 60
+    on_error: "continue"

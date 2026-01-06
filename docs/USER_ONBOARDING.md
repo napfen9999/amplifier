@@ -466,6 +466,75 @@ amplifier session show <session-id>
 
 For visual log inspection, see [amplifier-log-viewer](https://github.com/microsoft/amplifier-app-log-viewer).
 
+### Clean Reinstall (Recovery)
+
+If `amplifier update` leaves things in a broken state, or you encounter persistent issues that configuration changes don't fix, this procedure reliably restores a working installation.
+
+**Step 1: Clear Amplifier data directory**
+
+```bash
+# Option A: Full reset (recommended - cleanest)
+rm -rf ~/.amplifier
+
+# Option B: Preserve session history (keeps transcripts)
+cd ~/.amplifier
+ls  # See what's there
+rm -rf collections collections.lock keys.env settings.yaml
+# Keep: projects/ (session transcripts)
+```
+
+> **Note**: Files like `settings.yaml`, `keys.env`, and `collections.lock` CAN be preserved, but they may be the source of issues. We recommend clearing them for a clean slate. Use your discretion based on how much you've customized.
+
+**Step 2: Clean UV cache and uninstall**
+
+```bash
+# Make sure you're not in an active virtual environment
+deactivate 2>/dev/null || true
+
+# Clear UV's cache
+uv cache clean
+
+# Uninstall Amplifier
+uv tool uninstall amplifier
+
+# Verify it's gone
+which amplifier
+# Should return nothing or "amplifier not found"
+```
+
+**Step 3: Reinstall fresh**
+
+```bash
+uv tool install git+https://github.com/microsoft/amplifier
+```
+
+**Step 4: Reconfigure and test**
+
+```bash
+# Run first-time setup
+amplifier init
+
+# Smoke test
+amplifier
+# Type "Hi" and verify you get a response
+# Type "exit" to quit
+```
+
+**When to use this**:
+- After `amplifier update` breaks functionality
+- When module resolution fails unexpectedly
+- Persistent errors that don't resolve with config changes
+- "Stale state" issues where cached modules conflict
+
+**What Option A (full reset) clears**:
+- API keys (`keys.env`) - you'll re-enter during `init`
+- Settings (`settings.yaml`) - you'll reconfigure
+- Installed collections (`collections/`, `collections.lock`)
+- Session history (`projects/`) - conversation transcripts
+
+**What Option B preserves**:
+- Session history in `~/.amplifier/projects/` - your conversation transcripts
+
 ---
 
 ## Quick Command Reference
@@ -566,7 +635,7 @@ When no scope specified, commands prompt interactively.
 - **[Collection Authoring](https://github.com/microsoft/amplifier-collections/blob/main/docs/AUTHORING.md)** - Creating collections
 - [SCENARIO_TOOLS_GUIDE.md](SCENARIO_TOOLS_GUIDE.md) - Building sophisticated CLI tools
 - **[Profile Authoring](https://github.com/microsoft/amplifier-profiles/blob/main/docs/PROFILE_AUTHORING.md)** - Create custom profiles
-- **[Agent Authoring](https://github.com/microsoft/amplifier-profiles/blob/main/docs/AGENT_AUTHORING.md)** - Create custom agents
+- **[Agent Authoring](https://github.com/microsoft/amplifier-foundation/blob/main/docs/AGENT_AUTHORING.md)** - Create custom agents
 - **[Profile System Design](https://github.com/microsoft/amplifier-profiles/blob/main/docs/DESIGN.md)** - Profile system architecture
 - **[Module Resolution](https://github.com/microsoft/amplifier-module-resolution/blob/main/docs/USER_GUIDE.md)** - Module source management
 - [TOOLKIT_GUIDE.md](TOOLKIT_GUIDE.md) - Toolkit utilities for building tools
