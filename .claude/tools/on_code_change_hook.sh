@@ -152,7 +152,7 @@ elif make_target_exists "$PROJECT_ROOT" "check"; then
 else
     # Find the project root (may fail, that's OK)
     PROJECT_ROOT=$(find_project_root "$START_DIR" || echo "")
-    
+
     if [[ -n "$PROJECT_ROOT" ]] && make_target_exists "$PROJECT_ROOT" "check"; then
         echo "Running 'make check' from project root: $PROJECT_ROOT"
         cd "$PROJECT_ROOT"

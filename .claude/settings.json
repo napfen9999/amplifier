@@ -30,22 +30,13 @@
         ]
       }
     ],
-    "Stop": [
+    "UserPromptSubmit": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/tools/hook_stop.py"
-          }
-        ]
-      }
-    ],
-    "SubagentStop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/tools/hook_stop.py"
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/inject_doc_context.py",
+            "timeout": 5000
           }
         ]
       }
@@ -57,6 +48,16 @@
           {
             "type": "command",
             "command": "$CLAUDE_PROJECT_DIR/.claude/tools/subagent-logger.py"
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/validate_doc_before_code.py",
+            "timeout": 10000
           }
         ]
       }
@@ -77,6 +78,45 @@
           {
             "type": "command",
             "command": "$CLAUDE_PROJECT_DIR/.claude/tools/hook_post_tool_use.py"
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/validate_after_edit.py",
+            "timeout": 10000
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/tools/hook_stop.py"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/validate_on_stop.py",
+            "timeout": 10000
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/tools/hook_stop.py"
           }
         ]
       }
