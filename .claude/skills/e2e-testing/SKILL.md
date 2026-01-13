@@ -54,7 +54,31 @@ curl -s -X POST "http://localhost:8001/api/v1/interview/$SESSION_ID/message" \
 | **API Prefix** | All endpoints under `/api/v1/` |
 | **Message Field** | Use `"message"` not `"content"` |
 | **Turn Timing** | ~12-25s per turn (target: <5s) |
-| **Traceability** | Signals/Seeds/Deltas NOT persisted yet! |
+| **Traceability** | ProcessedSignals persisted via `/message/stream`! Seeds=0 if match_score<0.65 |
+| **Endpoint** | Use `/message/stream` for traceability, `/message` for simple tests |
+| **SSE Event Type** | Final response uses `"complete"` event (NOT `"done"`!) |
+| **Embedding Model** | Query client MUST use `voyage-3-large` to match Neo4j (see TD-EMB-001) |
+
+## Embedding Model Consistency (CRITICAL!)
+
+**Problem discovered 2026-01-11**: Query embeddings MUST use the same model as Neo4j database embeddings.
+
+| Component | Required Model | Notes |
+|-----------|---------------|-------|
+| Neo4j Enums | `voyage-3-large` | 847 Enums, 1024-dim vectors |
+| AsyncVoyageClient | `voyage-3-large` | `solver_api/src/embedding_search/voyage_client_async.py` |
+| SyncVoyageClient | `voyage-3-large` | `solver_api/src/embedding_search/voyage_client.py` |
+
+**Symptom of mismatch**: Signals extract correctly but `matched_enum_id` is NULL or wrong semantic match.
+
+**Verification query**:
+```sql
+-- Check if matches are semantically correct
+docker exec -i supabase_db_brand_composer_amplifyier psql -U postgres -d postgres -c \
+  "SELECT concept, matched_enum_name, match_score FROM processed_signals ORDER BY created_at DESC LIMIT 10;"
+```
+
+**Expected**: "Nachhaltigkeit" → "Nachhaltigkeits-Vision" (score ~0.85), NOT "Zugänglichkeits-Vision"
 
 ## Reference Files
 
