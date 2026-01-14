@@ -53,32 +53,50 @@ curl -s -X POST "http://localhost:8001/api/v1/interview/$SESSION_ID/message" \
 | **JWT Secret** | Must be `super-secret-jwt-token-with-at-least-32-characters-long` |
 | **API Prefix** | All endpoints under `/api/v1/` |
 | **Message Field** | Use `"message"` not `"content"` |
-| **Turn Timing** | ~12-25s per turn (target: <5s) |
+| **Turn Timing** | ~3.5s per turn (optimized from 31s) |
 | **Traceability** | ProcessedSignals persisted via `/message/stream`! Seeds=0 if match_score<0.65 |
-| **Endpoint** | Use `/message/stream` for traceability, `/message` for simple tests |
-| **SSE Event Type** | Final response uses `"complete"` event (NOT `"done"`!) |
-| **Embedding Model** | Query client MUST use `voyage-3-large` to match Neo4j (see TD-EMB-001) |
+| **Endpoint** | Use `/message/stream` for SSE streaming + traceability |
+| **SSE Events** | `listening` → `understanding` → `thinking` → `token` (×N) → `complete` |
+| **Embedding Model** | Query client uses `voyage-3-large` to match Neo4j |
 
-## Embedding Model Consistency (CRITICAL!)
+## SSE Token Streaming (NEW)
 
-**Problem discovered 2026-01-11**: Query embeddings MUST use the same model as Neo4j database embeddings.
+The `/message/stream` endpoint now emits token-by-token events for real-time question display:
 
-| Component | Required Model | Notes |
-|-----------|---------------|-------|
-| Neo4j Enums | `voyage-3-large` | 847 Enums, 1024-dim vectors |
-| AsyncVoyageClient | `voyage-3-large` | `solver_api/src/embedding_search/voyage_client_async.py` |
-| SyncVoyageClient | `voyage-3-large` | `solver_api/src/embedding_search/voyage_client.py` |
-
-**Symptom of mismatch**: Signals extract correctly but `matched_enum_id` is NULL or wrong semantic match.
-
-**Verification query**:
-```sql
--- Check if matches are semantically correct
-docker exec -i supabase_db_brand_composer_amplifyier psql -U postgres -d postgres -c \
-  "SELECT concept, matched_enum_name, match_score FROM processed_signals ORDER BY created_at DESC LIMIT 10;"
+```bash
+# Test SSE streaming with token events
+curl -s -N -X POST "http://localhost:8001/api/v1/interview/$SESSION_ID/message/stream" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"message": "Test message"}' | grep "^event:"
 ```
 
-**Expected**: "Nachhaltigkeit" → "Nachhaltigkeits-Vision" (score ~0.85), NOT "Zugänglichkeits-Vision"
+**Expected events**:
+```
+event: listening
+event: understanding
+event: thinking
+event: token      # Multiple token events (Wort-für-Wort)
+event: token
+event: token
+...
+event: complete
+```
+
+## Embedding Model Consistency (RESOLVED)
+
+**Fixed 2026-01-11**: All embedding clients now use `voyage-3-large` consistently.
+
+| Component | Model | Status |
+|-----------|-------|--------|
+| Neo4j Enums | `voyage-3-large` | ✅ |
+| AsyncVoyageClient | `voyage-3-large` | ✅ |
+| SyncVoyageClient | `voyage-3-large` | ✅ |
+
+**Verification**:
+```bash
+docker exec -i supabase_db_brand_composer_amplifyier psql -U postgres -d postgres -c \
+  "SELECT concept, matched_enum_name, match_score FROM processed_signals ORDER BY created_at DESC LIMIT 5;"
+```
 
 ## Reference Files
 

@@ -81,13 +81,14 @@ curl http://localhost:80
 
 ### Traceability tables empty
 
-**Known Issue**: TraceabilityService is defined but never called!
+**RESOLVED (2026-01-10)**: Traceability is now fully working via `/message/stream` endpoint.
 
-ProcessedSignals, SolverSeeds, SolverDeltas are generated but NOT persisted.
+ProcessedSignals, SolverSeeds, SolverDeltas are generated AND persisted.
 
-**Workaround**: Check data via API logs:
+**Verification**:
 ```bash
-docker compose logs api | grep -E "(signal|seed|delta)"
+docker exec -i supabase_db_brand_composer_amplifyier psql -U postgres -d postgres -c \
+  "SELECT COUNT(*) as signals FROM processed_signals; SELECT COUNT(*) as seeds FROM solver_seeds; SELECT COUNT(*) as deltas FROM solver_deltas;"
 ```
 
 ### Session/Turns not persisting
@@ -100,26 +101,33 @@ docker exec -i supabase_db_brand_composer_amplifyier psql -U postgres -d postgre
 
 ## Performance Issues
 
-### Turn taking >20s
+### Turn taking >5s
 
-**Expected**: 12-25s (Haiku model)
-**Target**: <5s
+**Current**: ~3.5s per turn (optimized from 31s)
+**Achieved**: -89% latency reduction
 
-Current bottlenecks:
-- Signal extraction (~6s)
-- Batch query build (~5s)
-- Signal processing (~4s)
+Optimizations applied:
+- Haiku migration: 31s → 6.5s (-79%)
+- Prompt caching: 6.5s → 3.5s (-46%)
+- Solver vectorization: -54% solver latency
+
+If turns take >10s, check:
+- Neo4j connection (GraphCache loaded?)
+- LLM API latency
+- Network issues
 
 ## Container Issues
 
 ### API "unhealthy" status
 
-**Cause**: Graph cache loading (~3-5 min on first start)
+**Cause**: GraphCache loading (~2.5 min, loads 344k edges from Neo4j)
 
 **Wait**: Check logs for progress:
 ```bash
-docker compose logs api -f | grep -E "(Loaded|ready)"
+docker compose logs api -f | grep -E "(Loaded|ready|GraphCache)"
 ```
+
+**With file caching**: Subsequent starts take <10s (uses `/tmp/graph_cache.pkl`)
 
 ### Container has old code
 
